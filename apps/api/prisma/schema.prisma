@@ -1,0 +1,431 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  host
+  moderator
+  viewer
+}
+
+enum EventStatus {
+  draft
+  scheduled
+  live
+  ended
+  archived
+}
+
+enum OfferStatus {
+  pending
+  active
+  paused
+  closed
+  expired
+}
+
+enum OrderStatus {
+  pending
+  processing
+  paid
+  failed
+  refunded
+  cancelled
+}
+
+enum AssetType {
+  link
+  file
+}
+
+enum SlideType {
+  image
+  video
+  embed
+  html
+}
+
+enum SlideTransition {
+  none
+  fade
+  slide
+  zoom
+}
+
+enum RecordingStatus {
+  processing
+  ready
+  failed
+  deleted
+}
+
+enum GuestStatus {
+  invited
+  green_room
+  on_stage
+  removed
+}
+
+enum AccessRuleType {
+  public
+  member_only
+  token_gated
+  password
+  invite_only
+}
+
+enum ReferralAttributionType {
+  click
+  signup
+  purchase
+}
+
+model User {
+  id              String   @id @default(uuid())
+  email           String   @unique
+  passwordHash    String?  @map("password_hash")
+  walletAddress   String?  @map("wallet_address")
+  displayName     String   @map("display_name")
+  avatarUrl       String?  @map("avatar_url")
+  role            UserRole @default(viewer)
+  stripeCustomerId String? @map("stripe_customer_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  hostedEvents    Event[]           @relation("HostedEvents")
+  chatMessages    ChatMessage[]     @relation("UserMessages")
+  deletedMessages ChatMessage[]     @relation("DeletedMessages")
+  orders          Order[]
+  referrals       Referral[]
+  referralAttributions ReferralAttribution[]
+  eventGuests     EventGuest[]
+  timelineEvents  EventTimelineEvent[]
+
+  @@index([email])
+  @@index([walletAddress])
+  @@map("users")
+}
+
+model Event {
+  id                  String      @id @default(uuid())
+  hostId              String      @map("host_id")
+  title               String
+  description         String?
+  slug                String      @unique
+  status              EventStatus @default(draft)
+  scheduledStart      DateTime?   @map("scheduled_start")
+  actualStart         DateTime?   @map("actual_start")
+  actualEnd           DateTime?   @map("actual_end")
+  streamKey           String?     @map("stream_key")
+  playbackUrl         String?     @map("playback_url")
+  thumbnailUrl        String?     @map("thumbnail_url")
+  maxViewers          Int         @default(10000) @map("max_viewers")
+  chatEnabled         Boolean     @default(true) @map("chat_enabled")
+  offersEnabled       Boolean     @default(true) @map("offers_enabled")
+  replayOffersEnabled Boolean     @default(false) @map("replay_offers_enabled")
+  isPublic            Boolean     @default(true) @map("is_public")
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  host            User                 @relation("HostedEvents", fields: [hostId], references: [id])
+  assets          EventAsset[]
+  timelineEvents  EventTimelineEvent[]
+  offers          Offer[]
+  orders          Order[]
+  chatMessages    ChatMessage[]
+  referrals       Referral[]
+  recordings      Recording[]
+  guests          EventGuest[]
+  presentations   Presentation[]
+  accessRules     AccessRule[]
+
+  @@index([hostId])
+  @@index([status])
+  @@index([slug])
+  @@index([scheduledStart])
+  @@map("events")
+}
+
+model EventAsset {
+  id              String    @id @default(uuid())
+  eventId         String    @map("event_id")
+  type            AssetType
+  title           String
+  url             String
+  fileKey         String?   @map("file_key")
+  fileSize        BigInt?   @map("file_size")
+  mimeType        String?   @map("mime_type")
+  requiresPurchase Boolean  @default(false) @map("requires_purchase")
+  offerId         String?   @map("offer_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  event Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  offer Offer? @relation(fields: [offerId], references: [id])
+
+  @@index([eventId])
+  @@map("event_assets")
+}
+
+model EventTimelineEvent {
+  id             String   @id @default(uuid())
+  eventId        String   @map("event_id")
+  type           String
+  payload        Json
+  timestampMs    BigInt   @map("timestamp_ms")
+  createdById    String?  @map("created_by")
+  idempotencyKey String?  @map("idempotency_key")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  event     Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy User? @relation(fields: [createdById], references: [id])
+
+  @@unique([eventId, idempotencyKey])
+  @@index([eventId])
+  @@index([eventId, timestampMs])
+  @@index([eventId, type])
+  @@map("event_timeline_events")
+}
+
+model Product {
+  id             String   @id @default(uuid())
+  externalId     String?  @map("external_id")
+  name           String
+  description    String?
+  imageUrl       String?  @map("image_url")
+  basePrice      Decimal  @map("base_price") @db.Decimal(10, 2)
+  currency       String   @default("USD")
+  inventoryCount Int?     @map("inventory_count")
+  isActive       Boolean  @default(true) @map("is_active")
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  offers Offer[]
+  orders Order[]
+
+  @@index([externalId])
+  @@map("products")
+}
+
+model Offer {
+  id              String      @id @default(uuid())
+  eventId         String      @map("event_id")
+  productId       String      @map("product_id")
+  title           String
+  description     String?
+  offerPrice      Decimal     @map("offer_price") @db.Decimal(10, 2)
+  originalPrice   Decimal?    @map("original_price") @db.Decimal(10, 2)
+  discountPercent Int?        @map("discount_percent")
+  quantityLimit   Int?        @map("quantity_limit")
+  quantityClaimed Int         @default(0) @map("quantity_claimed")
+  timeLimitSeconds Int?       @map("time_limit_seconds")
+  status          OfferStatus @default(pending)
+  openedAt        DateTime?   @map("opened_at")
+  closedAt        DateTime?   @map("closed_at")
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  event   Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  product Product      @relation(fields: [productId], references: [id])
+  orders  Order[]
+  assets  EventAsset[]
+
+  @@index([eventId])
+  @@index([eventId, status])
+  @@map("offers")
+}
+
+model Order {
+  id                      String      @id @default(uuid())
+  userId                  String      @map("user_id")
+  eventId                 String?     @map("event_id")
+  offerId                 String?     @map("offer_id")
+  productId               String?     @map("product_id")
+  status                  OrderStatus @default(pending)
+  amount                  Decimal     @db.Decimal(10, 2)
+  currency                String      @default("USD")
+  stripePaymentIntentId   String?     @map("stripe_payment_intent_id")
+  stripeCheckoutSessionId String?     @map("stripe_checkout_session_id")
+  referralId              String?     @map("referral_id")
+  metadata                Json        @default("{}")
+  createdAt               DateTime    @default(now()) @map("created_at")
+  updatedAt               DateTime    @updatedAt @map("updated_at")
+
+  user     User          @relation(fields: [userId], references: [id])
+  event    Event?        @relation(fields: [eventId], references: [id])
+  offer    Offer?        @relation(fields: [offerId], references: [id])
+  product  Product?      @relation(fields: [productId], references: [id])
+  referral Referral?     @relation(fields: [referralId], references: [id])
+  events   OrderEvent[]
+
+  @@index([userId])
+  @@index([eventId])
+  @@index([stripePaymentIntentId])
+  @@index([status])
+  @@map("orders")
+}
+
+model OrderEvent {
+  id        String   @id @default(uuid())
+  orderId   String   @map("order_id")
+  type      String
+  payload   Json
+  source    String   @default("system")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_events")
+}
+
+model ChatMessage {
+  id          String   @id @default(uuid())
+  eventId     String   @map("event_id")
+  userId      String   @map("user_id")
+  content     String
+  isPinned    Boolean  @default(false) @map("is_pinned")
+  isDeleted   Boolean  @default(false) @map("is_deleted")
+  deletedById String?  @map("deleted_by")
+  timestampMs BigInt   @map("timestamp_ms")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  event     Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User  @relation("UserMessages", fields: [userId], references: [id])
+  deletedBy User? @relation("DeletedMessages", fields: [deletedById], references: [id])
+
+  @@index([eventId])
+  @@index([eventId, timestampMs])
+  @@index([eventId, isPinned])
+  @@map("chat_messages")
+}
+
+model Referral {
+  id               String   @id @default(uuid())
+  eventId          String   @map("event_id")
+  referrerId       String   @map("referrer_id")
+  code             String   @unique
+  clicks           Int      @default(0)
+  conversions      Int      @default(0)
+  revenueGenerated Decimal  @default(0) @map("revenue_generated") @db.Decimal(10, 2)
+  commissionRate   Decimal  @default(0.10) @map("commission_rate") @db.Decimal(5, 4)
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  event       Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  referrer    User                  @relation(fields: [referrerId], references: [id])
+  orders      Order[]
+  attributions ReferralAttribution[]
+
+  @@index([eventId])
+  @@index([code])
+  @@index([referrerId])
+  @@map("referrals")
+}
+
+model ReferralAttribution {
+  id         String                  @id @default(uuid())
+  referralId String                  @map("referral_id")
+  userId     String                  @map("user_id")
+  orderId    String?                 @map("order_id")
+  type       ReferralAttributionType
+  createdAt  DateTime                @default(now()) @map("created_at")
+
+  referral Referral @relation(fields: [referralId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@index([referralId])
+  @@map("referral_attributions")
+}
+
+model AccessRule {
+  id        String         @id @default(uuid())
+  eventId   String         @map("event_id")
+  type      AccessRuleType
+  config    Json           @default("{}")
+  priority  Int            @default(0)
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@map("access_rules")
+}
+
+model Recording {
+  id              String          @id @default(uuid())
+  eventId         String          @map("event_id")
+  provider        String
+  providerAssetId String          @map("provider_asset_id")
+  playbackUrl     String?         @map("playback_url")
+  downloadUrl     String?         @map("download_url")
+  durationSeconds Int?            @map("duration_seconds")
+  status          RecordingStatus @default(processing)
+  fileSize        BigInt?         @map("file_size")
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@map("recordings")
+}
+
+model EventGuest {
+  id        String      @id @default(uuid())
+  eventId   String      @map("event_id")
+  userId    String      @map("user_id")
+  status    GuestStatus @default(invited)
+  joinToken String?     @map("join_token")
+  joinedAt  DateTime?   @map("joined_at")
+  leftAt    DateTime?   @map("left_at")
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@index([eventId])
+  @@map("event_guests")
+}
+
+model Presentation {
+  id                String   @id @default(uuid())
+  eventId           String   @map("event_id")
+  title             String
+  isActive          Boolean  @default(false) @map("is_active")
+  currentSlideIndex Int      @default(0) @map("current_slide_index")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  event  Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  slides Slide[]
+
+  @@index([eventId])
+  @@index([eventId, isActive])
+  @@map("presentations")
+}
+
+model Slide {
+  id              String          @id @default(uuid())
+  presentationId  String          @map("presentation_id")
+  slideIndex      Int             @map("slide_index")
+  type            SlideType       @default(image)
+  title           String?
+  contentUrl      String?         @map("content_url")
+  thumbnailUrl    String?         @map("thumbnail_url")
+  htmlContent     String?         @map("html_content")
+  notes           String?
+  durationSeconds Int?            @map("duration_seconds")
+  transition      SlideTransition @default(fade)
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  presentation Presentation @relation(fields: [presentationId], references: [id], onDelete: Cascade)
+
+  @@unique([presentationId, slideIndex])
+  @@index([presentationId])
+  @@index([presentationId, slideIndex])
+  @@map("slides")
+}
