@@ -10,7 +10,7 @@ const SOUND_URLS: Record<string, string> = {
   fireworks: 'https://assets.mixkit.co/active_storage/sfx/1461/1461-preview.mp3',
   alert: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3',
   drumroll: 'https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3',
-  chaching: 'https://assets.mixkit.co/active_storage/sfx/2954/2954-preview.mp3',
+  chaching: '/sounds/chaching.mp3',
   success: 'https://assets.mixkit.co/active_storage/sfx/2190/2190-preview.mp3',
   tada: 'https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3',
 };
