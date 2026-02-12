@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import {
   Mic,
@@ -33,6 +33,11 @@ import {
   Award,
   Pin,
   Trash2,
+  Presentation,
+  Upload,
+  ChevronRight,
+  X,
+  Plus,
 } from 'lucide-react';
 
 // Mock data
@@ -65,6 +70,15 @@ const SOUND_EFFECTS = [
   { id: 'fail', name: 'Fail', icon: <AlertCircle className="w-5 h-5" />, color: 'bg-gray-100 text-gray-600 hover:bg-gray-200' },
 ];
 
+// Mock slides for Slide Studio
+const MOCK_SLIDES = [
+  { id: '1', title: 'Welcome', color: 'from-indigo-500 to-purple-600', content: 'Summer Flash Sale 2024' },
+  { id: '2', title: 'Product Intro', color: 'from-pink-500 to-rose-500', content: 'Introducing Our New Collection' },
+  { id: '3', title: 'Features', color: 'from-emerald-500 to-teal-500', content: '50% Off All Items Today!' },
+  { id: '4', title: 'Pricing', color: 'from-amber-500 to-orange-500', content: 'Limited Time Offer' },
+  { id: '5', title: 'Call to Action', color: 'from-blue-500 to-cyan-500', content: 'Shop Now & Save Big!' },
+];
+
 const colors = [
   'from-pink-500 to-rose-500',
   'from-violet-500 to-purple-500',
@@ -80,6 +94,10 @@ export default function DemoAdminPage() {
   const [micEnabled, setMicEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [playingSound, setPlayingSound] = useState<string | null>(null);
+  const [slideStudioOpen, setSlideStudioOpen] = useState(false);
+  const [activeSlide, setActiveSlide] = useState<string | null>(null);
+  const [slides, setSlides] = useState(MOCK_SLIDES);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isLive) {
@@ -129,28 +147,77 @@ export default function DemoAdminPage() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-4">
+        <nav className="flex-1 p-4 overflow-y-auto">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Broadcast</p>
           <ul className="space-y-1">
             <li>
-              <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-indigo-50 text-indigo-700 font-medium">
+              <button
+                onClick={() => { setSlideStudioOpen(false); setActiveSlide(null); }}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-medium ${!slideStudioOpen ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100'}`}
+              >
                 <Video className="w-5 h-5" />
                 Live Studio
               </button>
             </li>
             <li>
-              <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100">
-                <LayoutGrid className="w-5 h-5" />
-                Dashboard
-              </button>
-            </li>
-            <li>
-              <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100">
-                <Settings className="w-5 h-5" />
-                Settings
+              <button
+                onClick={() => setSlideStudioOpen(!slideStudioOpen)}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium ${slideStudioOpen ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100'}`}
+              >
+                <div className="flex items-center gap-3">
+                  <Presentation className="w-5 h-5" />
+                  Slide Studio
+                </div>
+                <ChevronRight className={`w-4 h-4 transition-transform ${slideStudioOpen ? 'rotate-90' : ''}`} />
               </button>
             </li>
           </ul>
+
+          {/* Slide Studio Panel */}
+          {slideStudioOpen && (
+            <div className="mt-2 ml-2 pl-4 border-l-2 border-indigo-200">
+              <div className="space-y-2 mb-3">
+                {slides.map((slide, index) => (
+                  <button
+                    key={slide.id}
+                    onClick={() => setActiveSlide(slide.id)}
+                    className={`w-full group relative rounded-lg overflow-hidden transition ${activeSlide === slide.id ? 'ring-2 ring-indigo-500 ring-offset-2' : 'hover:ring-2 hover:ring-gray-300'}`}
+                  >
+                    <div className={`aspect-video bg-gradient-to-br ${slide.color} flex items-center justify-center p-2`}>
+                      <span className="text-white text-xs font-medium text-center truncate">{slide.content}</span>
+                    </div>
+                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1">
+                      <span className="text-white text-xs">{index + 1}. {slide.title}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="text-xs font-medium">Add Slide</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  // Mock adding slides
+                  const newSlides = Array.from(e.target.files || []).map((file, i) => ({
+                    id: `new-${Date.now()}-${i}`,
+                    title: file.name.split('.')[0],
+                    color: colors[Math.floor(Math.random() * colors.length)].replace('from-', 'from-').replace(' to-', ' to-'),
+                    content: file.name,
+                  }));
+                  setSlides([...slides, ...newSlides]);
+                }}
+              />
+            </div>
+          )}
 
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 mt-6">Quick Actions</p>
           <ul className="space-y-1">
@@ -217,23 +284,98 @@ export default function DemoAdminPage() {
         <div className="flex-1 p-6 flex gap-6">
           {/* Video + Controls */}
           <div className="flex-1 flex flex-col">
-            {/* Video Container */}
+            {/* Video/Slide Container */}
             <div className="flex-1 bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl overflow-hidden relative shadow-xl min-h-[400px]">
-              {/* Simulated video background */}
-              <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1560250097-0b93528c311a?w=800')] bg-cover bg-center opacity-90" />
 
-              {!videoEnabled && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
-                  <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white text-4xl font-bold">
-                    H
+              {/* Full Screen Slide View */}
+              {activeSlide && (
+                <>
+                  {/* Slide Content */}
+                  <div className={`absolute inset-0 bg-gradient-to-br ${slides.find(s => s.id === activeSlide)?.color} flex items-center justify-center`}>
+                    <div className="text-center text-white p-8">
+                      <h2 className="text-5xl font-bold mb-4">{slides.find(s => s.id === activeSlide)?.content}</h2>
+                      <p className="text-xl opacity-80">{slides.find(s => s.id === activeSlide)?.title}</p>
+                    </div>
                   </div>
-                </div>
+
+                  {/* PiP Video - Click to go back to full screen */}
+                  <button
+                    onClick={() => setActiveSlide(null)}
+                    className="absolute bottom-4 right-4 w-48 h-32 rounded-xl overflow-hidden shadow-2xl border-2 border-white/30 hover:border-white/60 transition group cursor-pointer"
+                  >
+                    <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400')] bg-cover bg-center" />
+                    {!videoEnabled && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
+                        <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white text-lg font-bold">
+                          H
+                        </div>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center">
+                      <Maximize className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition" />
+                    </div>
+                    <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/50 rounded-full text-white text-xs">
+                      You
+                    </div>
+                  </button>
+
+                  {/* Slide Navigation */}
+                  <div className="absolute bottom-4 left-4 flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const currentIndex = slides.findIndex(s => s.id === activeSlide);
+                        if (currentIndex > 0) setActiveSlide(slides[currentIndex - 1].id);
+                      }}
+                      disabled={slides.findIndex(s => s.id === activeSlide) === 0}
+                      className="p-2 bg-black/50 hover:bg-black/70 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-white transition"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <span className="px-3 py-1 bg-black/50 rounded-lg text-white text-sm">
+                      {slides.findIndex(s => s.id === activeSlide) + 1} / {slides.length}
+                    </span>
+                    <button
+                      onClick={() => {
+                        const currentIndex = slides.findIndex(s => s.id === activeSlide);
+                        if (currentIndex < slides.length - 1) setActiveSlide(slides[currentIndex + 1].id);
+                      }}
+                      disabled={slides.findIndex(s => s.id === activeSlide) === slides.length - 1}
+                      className="p-2 bg-black/50 hover:bg-black/70 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-white transition"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Close slide button */}
+                  <button
+                    onClick={() => setActiveSlide(null)}
+                    className="absolute top-4 left-4 p-2 bg-black/50 hover:bg-black/70 rounded-lg text-white transition"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </>
               )}
 
-              {/* You label */}
-              <div className="absolute top-4 left-4 px-3 py-1 bg-black/50 rounded-full text-white text-sm">
-                You
-              </div>
+              {/* Full Screen Video View */}
+              {!activeSlide && (
+                <>
+                  {/* Simulated video background */}
+                  <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1560250097-0b93528c311a?w=800')] bg-cover bg-center opacity-90" />
+
+                  {!videoEnabled && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
+                      <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white text-4xl font-bold">
+                        H
+                      </div>
+                    </div>
+                  )}
+
+                  {/* You label */}
+                  <div className="absolute top-4 left-4 px-3 py-1 bg-black/50 rounded-full text-white text-sm">
+                    You
+                  </div>
+                </>
+              )}
 
               {/* Live indicator */}
               {isLive && (
@@ -244,10 +386,12 @@ export default function DemoAdminPage() {
               )}
 
               {/* Viewer count */}
-              <div className="absolute bottom-4 left-4 px-3 py-1 bg-black/50 rounded-full text-white text-sm flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                {MOCK_VIEWERS.length} viewers
-              </div>
+              {!activeSlide && (
+                <div className="absolute bottom-4 left-4 px-3 py-1 bg-black/50 rounded-full text-white text-sm flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  {MOCK_VIEWERS.length} viewers
+                </div>
+              )}
             </div>
 
             {/* Video Controls */}
