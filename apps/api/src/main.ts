@@ -26,8 +26,8 @@ async function bootstrap() {
 
   // Swagger documentation
   const config = new DocumentBuilder()
-    .setTitle('Shoppable Webinar API')
-    .setDescription('API for the Shoppable Webinar Platform')
+    .setTitle('FFLOW CAST API')
+    .setDescription('API for the FFLOW CAST Platform')
     .setVersion('1.0')
     .addBearerAuth()
     .build();

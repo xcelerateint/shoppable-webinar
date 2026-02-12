@@ -44,7 +44,7 @@ export default function RegisterPage() {
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <Link href="/" className="text-2xl font-bold text-white">
-            Shoppable Webinar
+            FFLOW CAST
           </Link>
           <h1 className="text-3xl font-bold text-white mt-6">Create Account</h1>
           <p className="text-gray-400 mt-2">Start hosting live shopping events</p>

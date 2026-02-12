@@ -46,7 +46,7 @@ export default function EventsPage() {
       <header className="border-b border-gray-800">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="text-2xl font-bold text-white">
-            Shoppable Webinar
+            FFLOW CAST
           </Link>
           <nav className="flex items-center gap-4">
             <Link href="/login" className="text-gray-300 hover:text-white">

@@ -5,7 +5,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-gray-900">
       <header className="border-b border-gray-800">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-white">Shoppable Webinar</h1>
+          <h1 className="text-2xl font-bold text-white">FFLOW CAST</h1>
           <nav className="flex items-center gap-4">
             <Link href="/login" className="text-gray-300 hover:text-white">
               Login

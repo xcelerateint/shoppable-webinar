@@ -5,7 +5,7 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Shoppable Webinar',
+  title: 'FFLOW CAST',
   description: 'Live shopping events with real-time offers',
 };
 
