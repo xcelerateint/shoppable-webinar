@@ -58,6 +58,19 @@ const MOCK_MESSAGES = [
   { id: '5', user: 'Host', content: 'Flash deal coming in 2 minutes!', role: 'host' },
 ];
 
+// Sound URLs for actual audio playback
+const SOUND_URLS: Record<string, string> = {
+  applause: '/sounds/applause.mp3',
+  cheering: 'https://assets.mixkit.co/active_storage/sfx/2193/2193-preview.mp3',
+  fireworks: 'https://assets.mixkit.co/active_storage/sfx/1461/1461-preview.mp3',
+  alert: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3',
+  drumroll: 'https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3',
+  chaching: '/sounds/chaching.mp3',
+  success: 'https://assets.mixkit.co/active_storage/sfx/2190/2190-preview.mp3',
+  tada: 'https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3',
+  fail: '/sounds/fail.mp3',
+};
+
 const SOUND_EFFECTS = [
   { id: 'applause', name: 'Applause', icon: <Users className="w-5 h-5" />, color: 'bg-pink-100 text-pink-600 hover:bg-pink-200' },
   { id: 'cheering', name: 'Cheering', icon: <ThumbsUp className="w-5 h-5" />, color: 'bg-blue-100 text-blue-600 hover:bg-blue-200' },
@@ -101,6 +114,7 @@ export default function DemoAdminPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Start camera on mount
   useEffect(() => {
@@ -168,8 +182,21 @@ export default function DemoAdminPage() {
   };
 
   const playSound = (soundId: string) => {
+    if (playingSound) return; // Prevent overlapping sounds
+
     setPlayingSound(soundId);
-    setTimeout(() => setPlayingSound(null), 1500);
+
+    const url = SOUND_URLS[soundId];
+    if (url) {
+      if (!audioRef.current) {
+        audioRef.current = new Audio();
+      }
+      audioRef.current.src = url;
+      audioRef.current.volume = 0.6;
+      audioRef.current.play().catch(err => console.log('Audio play error:', err));
+    }
+
+    setTimeout(() => setPlayingSound(null), 2000);
   };
 
   return (
