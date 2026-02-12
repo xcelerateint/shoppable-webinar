@@ -461,11 +461,11 @@ export default function DemoAdminPage() {
         </header>
 
         {/* Video Area */}
-        <div className="flex-1 p-6 flex gap-6">
+        <div className="flex-1 p-6 flex gap-6 overflow-hidden">
           {/* Video + Controls */}
-          <div className="flex-1 flex flex-col">
-            {/* Video/Slide Container */}
-            <div className="flex-1 bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl overflow-hidden relative shadow-xl min-h-[400px]">
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Video/Slide Container - Fixed 16:9 aspect ratio */}
+            <div className="w-full aspect-video bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl overflow-hidden relative shadow-xl">
 
               {/* Full Screen Slide View */}
               {activeSlide && !liveWebsiteActive && (
