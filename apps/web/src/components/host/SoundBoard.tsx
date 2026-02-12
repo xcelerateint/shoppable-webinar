@@ -19,6 +19,7 @@ const SOUND_URLS: Record<string, string> = {
   chaching: '/sounds/chaching.mp3', // Cash register
   success: 'https://assets.mixkit.co/active_storage/sfx/2190/2190-preview.mp3', // Success fanfare
   tada: 'https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3', // Ta-da reveal
+  fail: '/sounds/fail.mp3', // Fail trumpet
 };
 
 const SOUND_EFFECTS: SoundEffect[] = [
@@ -30,6 +31,7 @@ const SOUND_EFFECTS: SoundEffect[] = [
   { id: 'success', name: 'Success', icon: <Award className="w-4 h-4" /> },
   { id: 'alert', name: 'Alert', icon: <AlertCircle className="w-4 h-4" /> },
   { id: 'fireworks', name: 'Celebrate', icon: <Sparkles className="w-4 h-4" /> },
+  { id: 'fail', name: 'Fail', icon: <AlertCircle className="w-4 h-4" /> },
 ];
 
 interface SoundBoardProps {

@@ -13,6 +13,7 @@ const SOUND_URLS: Record<string, string> = {
   chaching: '/sounds/chaching.mp3',
   success: 'https://assets.mixkit.co/active_storage/sfx/2190/2190-preview.mp3',
   tada: 'https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3',
+  fail: '/sounds/fail.mp3',
 };
 
 const SOUND_LABELS: Record<string, string> = {
@@ -24,6 +25,7 @@ const SOUND_LABELS: Record<string, string> = {
   chaching: 'Sale!',
   success: 'Success',
   tada: 'Ta-Da!',
+  fail: 'Fail!',
 };
 
 interface SoundEffectPlayerProps {
