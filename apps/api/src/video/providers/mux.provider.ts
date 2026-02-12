@@ -47,7 +47,9 @@ export class MuxProvider implements VideoProvider {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to create Mux live stream: ${response.statusText}`);
+      const errorBody = await response.text();
+      console.error('Mux API Error:', response.status, errorBody);
+      throw new Error(`Failed to create Mux live stream: ${response.statusText} - ${errorBody}`);
     }
 
     const data = await response.json();

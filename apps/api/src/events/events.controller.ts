@@ -7,10 +7,13 @@ import {
   Body,
   Param,
   UseGuards,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { EventsService } from './events.service';
 import { CreateEventDto, UpdateEventDto } from './dto/event.dto';
+import { WebsocketGateway } from '../websocket/websocket.gateway';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -20,7 +23,11 @@ import { Public } from '../auth/decorators/public.decorator';
 @ApiTags('events')
 @Controller('events')
 export class EventsController {
-  constructor(private eventsService: EventsService) {}
+  constructor(
+    private eventsService: EventsService,
+    @Inject(forwardRef(() => WebsocketGateway))
+    private wsGateway: WebsocketGateway,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -124,5 +131,55 @@ export class EventsController {
   @ApiOperation({ summary: 'Get RTMP stream key (host only)' })
   async getStreamKey(@Param('id') id: string, @CurrentUser() user: CurrentUserData) {
     return this.eventsService.getStreamKey(id, user.id);
+  }
+
+  @Post(':id/test-stream')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'host')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Start a test stream (for testing without OBS)' })
+  async startTestStream(@Param('id') id: string, @CurrentUser() user: CurrentUserData) {
+    return this.eventsService.startTestStream(id, user.id);
+  }
+
+  @Post(':id/stop-test-stream')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'host')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Stop the test stream' })
+  async stopTestStream(@Param('id') id: string, @CurrentUser() user: CurrentUserData) {
+    return this.eventsService.stopTestStream(id, user.id);
+  }
+
+  @Post(':id/sound-effect')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'host')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Trigger a sound effect for all viewers' })
+  async triggerSoundEffect(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserData,
+    @Body() body: { soundId: string },
+  ) {
+    return this.eventsService.triggerSoundEffect(id, user.id, body.soundId);
+  }
+
+  @Get(':id/viewers')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'host')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current viewers for an event' })
+  async getViewers(@Param('id') id: string, @CurrentUser() user: CurrentUserData) {
+    // Verify user owns this event
+    const event = await this.eventsService.findById(id);
+    if (!event || event.hostId !== user.id) {
+      return { viewers: [], count: 0 };
+    }
+
+    const viewers = this.wsGateway.getEventViewers(id);
+    return {
+      viewers,
+      count: viewers.length,
+    };
   }
 }

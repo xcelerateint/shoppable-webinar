@@ -3,6 +3,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { RedisService } from '../common/redis/redis.service';
 import { WebsocketGateway } from '../websocket/websocket.gateway';
 import { CreateTimelineEventDto } from './dto/timeline.dto';
+import { Prisma } from '@prisma/client';
 
 interface CreateTimelineEventParams {
   type: string;
@@ -40,7 +41,7 @@ export class TimelineService {
       data: {
         eventId,
         type: params.type,
-        payload: params.payload,
+        payload: params.payload as Prisma.InputJsonValue,
         timestampMs: params.timestampMs ?? 0,
         createdById: createdById !== 'system' ? createdById : null,
         idempotencyKey: params.idempotencyKey,

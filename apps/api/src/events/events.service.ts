@@ -10,9 +10,12 @@ import { VideoService } from '../video/video.service';
 import { CreateEventDto, UpdateEventDto } from './dto/event.dto';
 import { EventStatus } from '@prisma/client';
 import { generateSlug } from '@shoppable-webinar/shared';
+import { spawn, ChildProcess } from 'child_process';
 
 @Injectable()
 export class EventsService {
+  private testStreamProcesses: Map<string, ChildProcess> = new Map();
+
   constructor(
     private prisma: PrismaService,
     private redis: RedisService,
@@ -352,5 +355,128 @@ export class EventsService {
       select: { actualStart: true },
     });
     return event?.actualStart || null;
+  }
+
+  async startTestStream(id: string, hostId: string) {
+    const event = await this.findById(id);
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+    if (event.hostId !== hostId) {
+      throw new ForbiddenException('Not authorized to start this event');
+    }
+
+    // First set event to live if not already
+    if (event.status === 'scheduled') {
+      await this.prisma.event.update({
+        where: { id },
+        data: {
+          status: 'live',
+          actualStart: new Date(),
+        },
+      });
+    }
+
+    // Check if already streaming
+    if (this.testStreamProcesses.has(id)) {
+      return { message: 'Test stream already running', status: 'streaming' };
+    }
+
+    const streamKey = event.streamKey;
+    const rtmpUrl = `rtmps://global-live.mux.com:443/app/${streamKey}`;
+
+    // Use FFmpeg to generate a test pattern and stream to Mux
+    // This creates a colored bars test pattern with a timestamp
+    const ffmpegArgs = [
+      '-re',
+      '-f', 'lavfi',
+      '-i', `testsrc=size=1280x720:rate=30,drawtext=fontfile=Arial:fontsize=72:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2:text='LIVE TEST STREAM':box=1:boxcolor=black@0.5`,
+      '-f', 'lavfi',
+      '-i', 'sine=frequency=1000:sample_rate=44100',
+      '-c:v', 'libx264',
+      '-preset', 'veryfast',
+      '-b:v', '2500k',
+      '-maxrate', '2500k',
+      '-bufsize', '5000k',
+      '-pix_fmt', 'yuv420p',
+      '-g', '60',
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      '-ar', '44100',
+      '-f', 'flv',
+      rtmpUrl,
+    ];
+
+    try {
+      const ffmpeg = spawn('ffmpeg', ffmpegArgs);
+      this.testStreamProcesses.set(id, ffmpeg);
+
+      ffmpeg.stdout.on('data', (data) => {
+        console.log(`FFmpeg stdout: ${data}`);
+      });
+
+      ffmpeg.stderr.on('data', (data) => {
+        console.log(`FFmpeg: ${data}`);
+      });
+
+      ffmpeg.on('close', (code) => {
+        console.log(`FFmpeg process exited with code ${code}`);
+        this.testStreamProcesses.delete(id);
+      });
+
+      ffmpeg.on('error', (err) => {
+        console.error('Failed to start FFmpeg:', err);
+        this.testStreamProcesses.delete(id);
+      });
+
+      return {
+        message: 'Test stream started',
+        status: 'streaming',
+        note: 'Streaming test pattern to Mux. The video should appear in a few seconds.',
+      };
+    } catch (error) {
+      console.error('Error starting test stream:', error);
+      throw new BadRequestException(
+        'Failed to start test stream. Make sure FFmpeg is installed on the server.',
+      );
+    }
+  }
+
+  async stopTestStream(id: string, hostId: string) {
+    const event = await this.findById(id);
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+    if (event.hostId !== hostId) {
+      throw new ForbiddenException('Not authorized to stop this event');
+    }
+
+    const process = this.testStreamProcesses.get(id);
+    if (process) {
+      process.kill('SIGTERM');
+      this.testStreamProcesses.delete(id);
+      return { message: 'Test stream stopped', status: 'stopped' };
+    }
+
+    return { message: 'No test stream running', status: 'idle' };
+  }
+
+  async triggerSoundEffect(id: string, hostId: string, soundId: string) {
+    const event = await this.findById(id);
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+    if (event.hostId !== hostId) {
+      throw new ForbiddenException('Not authorized to trigger sound effects');
+    }
+
+    // Broadcast sound effect to all viewers via Redis pub/sub
+    await this.redis.publish(`event:${id}:sound`, JSON.stringify({
+      type: 'SOUND_EFFECT',
+      soundId,
+      timestamp: Date.now(),
+    }));
+
+    return { success: true, soundId };
   }
 }

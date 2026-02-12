@@ -81,6 +81,7 @@ interface ViewerState {
   setEvent: (eventId: string, title: string, status: string, playbackUrl: string | null) => void;
   setViewerCount: (count: number) => void;
   setHostLive: (isLive: boolean) => void;
+  setMessages: (messages: ChatMessage[]) => void;
   addMessage: (message: ChatMessage) => void;
   deleteMessage: (messageId: string) => void;
   setPinnedMessage: (message: ChatMessage | null) => void;
@@ -121,6 +122,8 @@ export const useViewerStore = create<ViewerState>((set) => ({
   setViewerCount: (count) => set({ viewerCount: count }),
 
   setHostLive: (isLive) => set({ isHostLive: isLive }),
+
+  setMessages: (messages) => set({ messages }),
 
   addMessage: (message) =>
     set((state) => ({

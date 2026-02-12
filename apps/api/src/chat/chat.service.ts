@@ -88,6 +88,11 @@ export class ChatService {
       },
     });
 
+    const result = {
+      ...message,
+      timestampMs: Number(message.timestampMs),
+    };
+
     // Broadcast via WebSocket
     this.wsGateway.broadcastChatMessage(eventId, {
       id: message.id,
@@ -102,10 +107,12 @@ export class ChatService {
       createdAt: message.createdAt,
     });
 
-    return message;
+    return result;
   }
 
-  async findByEvent(eventId: string, limit = 100, beforeId?: string) {
+  async findByEvent(eventId: string, limit?: number, beforeId?: string) {
+    const takeLimit = limit && limit > 0 ? limit : 100;
+
     const where: { eventId: string; isDeleted: boolean; createdAt?: { lt: Date } } = {
       eventId,
       isDeleted: false,
@@ -120,10 +127,10 @@ export class ChatService {
       }
     }
 
-    return this.prisma.chatMessage.findMany({
+    const messages = await this.prisma.chatMessage.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      take: limit,
+      take: takeLimit,
       include: {
         user: {
           select: {
@@ -135,6 +142,12 @@ export class ChatService {
         },
       },
     });
+
+    // Convert BigInt to Number for JSON serialization
+    return messages.map(msg => ({
+      ...msg,
+      timestampMs: Number(msg.timestampMs),
+    }));
   }
 
   async delete(messageId: string, moderatorId: string, reason?: string) {
@@ -258,7 +271,7 @@ export class ChatService {
   }
 
   async getPinnedMessage(eventId: string) {
-    return this.prisma.chatMessage.findFirst({
+    const message = await this.prisma.chatMessage.findFirst({
       where: {
         eventId,
         isPinned: true,
@@ -275,5 +288,13 @@ export class ChatService {
         },
       },
     });
+
+    if (!message) return null;
+
+    // Convert BigInt to Number for JSON serialization
+    return {
+      ...message,
+      timestampMs: Number(message.timestampMs),
+    };
   }
 }

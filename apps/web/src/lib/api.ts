@@ -106,8 +106,8 @@ export const chat = {
       method: 'POST',
       body: { content, idempotencyKey },
     }),
-  delete: (eventId: string, messageId: string) =>
-    request(`/events/${eventId}/chat/${messageId}`, { method: 'DELETE' }),
+  delete: (eventId: string, messageId: string, reason?: string) =>
+    request(`/events/${eventId}/chat/${messageId}`, { method: 'DELETE', body: { reason: reason || 'Moderation' } }),
   pin: (eventId: string, messageId: string) =>
     request(`/events/${eventId}/chat/${messageId}/pin`, { method: 'POST' }),
   unpin: (eventId: string, messageId: string) =>

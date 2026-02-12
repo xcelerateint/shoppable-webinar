@@ -158,18 +158,18 @@ export default function DashboardPage() {
                     {getStatusBadge(event.status)}
                     {event.status === 'live' && (
                       <Link
-                        href={`/events/${event.id}/live`}
+                        href={`/events/${event.id}/broadcast`}
                         className="bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded text-sm"
                       >
-                        Go to Live
+                        Control Stream
                       </Link>
                     )}
                     {event.status === 'scheduled' && (
                       <Link
-                        href={`/events/${event.id}/live`}
+                        href={`/events/${event.id}/broadcast`}
                         className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-1.5 rounded text-sm"
                       >
-                        Start Event
+                        Go Live
                       </Link>
                     )}
                     {event.status === 'draft' && (

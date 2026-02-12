@@ -51,6 +51,9 @@ class WebSocketClient {
       'viewer_count',
       'host_status',
       'order_update',
+      'sound_effect',
+      'viewer_join',
+      'viewer_leave',
     ];
 
     eventTypes.forEach((eventType) => {
@@ -90,6 +93,10 @@ class WebSocketClient {
 
   sendChatMessage(content: string, idempotencyKey: string) {
     this.socket?.emit('chat_message', { content, idempotencyKey });
+  }
+
+  subscribeToHostChannel() {
+    this.socket?.emit('subscribe', { channels: ['host', 'orders'] });
   }
 
   requestStateSync(lastTimelineId?: string, lastChatId?: string) {

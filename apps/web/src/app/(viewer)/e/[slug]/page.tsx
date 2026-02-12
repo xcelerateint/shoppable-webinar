@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { events } from '@/lib/api';
+import { events, chat } from '@/lib/api';
 import { wsClient } from '@/lib/ws';
 import { useViewerStore } from '@/stores/viewerStore';
 import { VideoPlayer } from '@/components/viewer/VideoPlayer';
 import { ChatPanel } from '@/components/viewer/ChatPanel';
 import { OffersPanel } from '@/components/viewer/OffersPanel';
+import { SoundEffectPlayer } from '@/components/viewer/SoundEffectPlayer';
 import { Users, Share2, Link as LinkIcon, FileText } from 'lucide-react';
 
 interface EventData {
@@ -35,6 +36,7 @@ export default function ViewerPage() {
     viewerCount,
     setEvent,
     setViewerCount,
+    setMessages,
     addMessage,
     deleteMessage,
     setPinnedMessage,
@@ -59,6 +61,35 @@ export default function ViewerPage() {
         setViewerCount(data.viewerCount);
         setLoading(false);
 
+        // Load initial chat messages
+        if (data.chatEnabled) {
+          try {
+            const chatData = await chat.list(data.id, 50) as Array<{
+              id: string;
+              content: string;
+              user: { id: string; displayName: string; avatarUrl?: string; role: string };
+              timestampMs: number;
+              createdAt: string;
+            }>;
+            // Reverse to get oldest first for chronological display
+            setMessages(chatData.map(m => ({ ...m, createdAt: new Date(m.createdAt) })).reverse());
+
+            // Load pinned message
+            const pinned = await chat.getPinned(data.id) as {
+              id: string;
+              content: string;
+              user: { id: string; displayName: string; avatarUrl?: string; role: string };
+              timestampMs: number;
+              createdAt: string;
+            } | null;
+            if (pinned) {
+              setPinnedMessage({ ...pinned, createdAt: new Date(pinned.createdAt) });
+            }
+          } catch (chatErr) {
+            console.error('Failed to load chat:', chatErr);
+          }
+        }
+
         // Connect to WebSocket
         const token = localStorage.getItem('accessToken');
         wsClient.connect(data.id, token || undefined);
@@ -73,7 +104,7 @@ export default function ViewerPage() {
     return () => {
       wsClient.disconnect();
     };
-  }, [slug, setEvent, setViewerCount]);
+  }, [slug, setEvent, setViewerCount, setMessages, setPinnedMessage]);
 
   // Handle WebSocket messages
   useEffect(() => {
@@ -228,28 +259,28 @@ export default function ViewerPage() {
   return (
     <div className="min-h-screen bg-gray-900">
       {/* Header */}
-      <header className="border-b border-gray-800 px-4 py-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-white">{eventData.title}</h1>
-            <p className="text-sm text-gray-400">Hosted by {eventData.host.displayName}</p>
+      <header className="border-b border-gray-800 px-3 sm:px-4 py-2 sm:py-3">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-base sm:text-xl font-bold text-white truncate">{eventData.title}</h1>
+            <p className="text-xs sm:text-sm text-gray-400 truncate">Hosted by {eventData.host.displayName}</p>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-gray-400">
-              <Users className="w-5 h-5" />
+          <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+            <div className="flex items-center gap-1 sm:gap-2 text-gray-400 text-sm">
+              <Users className="w-4 h-4 sm:w-5 sm:h-5" />
               <span>{viewerCount.toLocaleString()}</span>
             </div>
-            <button className="flex items-center gap-2 text-gray-300 hover:text-white">
-              <Share2 className="w-5 h-5" />
-              <span className="hidden sm:inline">Share</span>
+            <button className="flex items-center gap-1 sm:gap-2 text-gray-300 hover:text-white p-1">
+              <Share2 className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="hidden sm:inline text-sm">Share</span>
             </button>
           </div>
         </div>
       </header>
 
       {/* Main content */}
-      <div className="max-w-7xl mx-auto px-4 py-4">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 py-2 sm:py-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 sm:gap-4">
           {/* Video and slides */}
           <div className="lg:col-span-2 space-y-4">
             <div className="relative aspect-video bg-gray-800 rounded-lg overflow-hidden">
@@ -336,6 +367,9 @@ export default function ViewerPage() {
           </div>
         </div>
       </div>
+
+      {/* Sound Effect Player */}
+      <SoundEffectPlayer eventId={eventData.id} />
     </div>
   );
 }

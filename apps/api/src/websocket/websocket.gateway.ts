@@ -18,6 +18,7 @@ interface AuthenticatedSocket extends Socket {
   userRole?: string;
   displayName?: string;
   eventId?: string;
+  joinedAt?: Date;
 }
 
 interface TimelineEventData {
@@ -53,6 +54,7 @@ export class WebsocketGateway implements OnGatewayConnection, OnGatewayDisconnec
   server: Server;
 
   private connectedClients: Map<string, AuthenticatedSocket> = new Map();
+  private subscribedEvents: Set<string> = new Set();
 
   constructor(
     private jwtService: JwtService,
@@ -60,6 +62,24 @@ export class WebsocketGateway implements OnGatewayConnection, OnGatewayDisconnec
     @Inject(forwardRef(() => ChatService))
     private chatService: ChatService,
   ) {}
+
+  private subscribeToEventSounds(eventId: string) {
+    if (this.subscribedEvents.has(eventId)) return;
+
+    this.subscribedEvents.add(eventId);
+    const channel = `event:${eventId}:sound`;
+
+    this.redis.subscribe(channel, (message) => {
+      try {
+        const data = JSON.parse(message);
+        if (data.type === 'SOUND_EFFECT') {
+          this.broadcastSoundEffect(eventId, data.soundId);
+        }
+      } catch (err) {
+        console.error('Failed to parse sound effect message:', err);
+      }
+    });
+  }
 
   async handleConnection(client: AuthenticatedSocket) {
     try {
@@ -75,11 +95,22 @@ export class WebsocketGateway implements OnGatewayConnection, OnGatewayDisconnec
 
       if (eventId) {
         client.eventId = eventId;
+        client.joinedAt = new Date();
         client.join(`event:${eventId}`);
+
+        // Subscribe to sound effects for this event
+        this.subscribeToEventSounds(eventId);
 
         // Increment viewer count
         const viewerCount = await this.redis.incrementViewerCount(eventId);
         this.broadcastViewerCount(eventId, viewerCount);
+
+        // Notify host of new viewer
+        this.broadcastViewerJoin(eventId, {
+          odId: client.userId,
+          displayName: client.displayName || 'Anonymous',
+          joinedAt: client.joinedAt,
+        });
       }
 
       this.connectedClients.set(client.id, client);
@@ -93,6 +124,7 @@ export class WebsocketGateway implements OnGatewayConnection, OnGatewayDisconnec
     if (client.eventId) {
       const viewerCount = await this.redis.decrementViewerCount(client.eventId);
       this.broadcastViewerCount(client.eventId, viewerCount);
+      this.broadcastViewerLeave(client.eventId, client.userId, client.displayName);
     }
     this.connectedClients.delete(client.id);
   }
@@ -139,6 +171,10 @@ export class WebsocketGateway implements OnGatewayConnection, OnGatewayDisconnec
         content: data.content,
         idempotencyKey: data.idempotencyKey,
       });
+
+      if (!message) {
+        return { error: 'Failed to create message' };
+      }
 
       return { status: 'sent', messageId: message.id };
     } catch (error) {
@@ -244,5 +280,56 @@ export class WebsocketGateway implements OnGatewayConnection, OnGatewayDisconnec
         data: { ...order, userId },
       });
     }
+  }
+
+  broadcastSoundEffect(eventId: string, soundId: string) {
+    this.server.to(`event:${eventId}`).emit('sound_effect', {
+      channel: 'effects',
+      type: 'SOUND_EFFECT',
+      data: { soundId, timestamp: Date.now() },
+    });
+  }
+
+  broadcastViewerJoin(eventId: string, viewer: { odId?: string; displayName: string; joinedAt: Date }) {
+    this.server.to(`event:${eventId}:host`).emit('viewer_join', {
+      channel: 'presence',
+      type: 'VIEWER_JOIN',
+      data: viewer,
+    });
+  }
+
+  broadcastViewerLeave(eventId: string, odId?: string, displayName?: string) {
+    this.server.to(`event:${eventId}:host`).emit('viewer_leave', {
+      channel: 'presence',
+      type: 'VIEWER_LEAVE',
+      data: { odId, displayName },
+    });
+  }
+
+  getEventViewers(eventId: string): Array<{
+    odId?: string;
+    displayName: string;
+    joinedAt?: Date;
+    isAuthenticated: boolean;
+  }> {
+    const viewers: Array<{
+      odId?: string;
+      displayName: string;
+      joinedAt?: Date;
+      isAuthenticated: boolean;
+    }> = [];
+
+    this.connectedClients.forEach((client) => {
+      if (client.eventId === eventId) {
+        viewers.push({
+          odId: client.userId,
+          displayName: client.displayName || 'Anonymous',
+          joinedAt: client.joinedAt,
+          isAuthenticated: !!client.userId,
+        });
+      }
+    });
+
+    return viewers;
   }
 }
