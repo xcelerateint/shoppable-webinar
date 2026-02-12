@@ -9,9 +9,9 @@ interface SoundEffect {
   icon: React.ReactNode;
 }
 
-// Sound effect URLs from Mixkit (free, reliable CDN)
+// Sound effect URLs - local files in /public/sounds/ or Mixkit CDN
 const SOUND_URLS: Record<string, string> = {
-  applause: 'https://assets.mixkit.co/active_storage/sfx/212/212-preview.mp3', // Audience applause
+  applause: '/sounds/applause.mp3', // Local file
   cheering: 'https://assets.mixkit.co/active_storage/sfx/2193/2193-preview.mp3', // Crowd cheering
   fireworks: 'https://assets.mixkit.co/active_storage/sfx/1461/1461-preview.mp3', // Fireworks
   alert: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3', // Alert notification
