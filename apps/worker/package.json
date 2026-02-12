@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "prebuild": "npm run build --workspace=@shoppable-webinar/shared",
+    "prebuild": "npm run build --workspace=@shoppable-webinar/shared && npx prisma generate --schema=../api/prisma/schema.prisma",
     "build": "tsc",
     "dev": "ts-node src/main.ts",
     "start": "node dist/main.js",
