@@ -97,7 +97,59 @@ export default function DemoAdminPage() {
   const [slideStudioOpen, setSlideStudioOpen] = useState(false);
   const [activeSlide, setActiveSlide] = useState<string | null>(null);
   const [slides, setSlides] = useState(MOCK_SLIDES);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+
+  // Start camera on mount
+  useEffect(() => {
+    startCamera();
+    return () => stopCamera();
+  }, []);
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+        audio: true,
+      });
+      mediaStreamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => {});
+      }
+      setCameraError(null);
+    } catch (err: any) {
+      console.error('Camera error:', err);
+      setCameraError('Camera access denied. Using demo mode.');
+    }
+  };
+
+  const stopCamera = () => {
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
+    }
+  };
+
+  const toggleMic = () => {
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getAudioTracks().forEach(track => {
+        track.enabled = !micEnabled;
+      });
+    }
+    setMicEnabled(!micEnabled);
+  };
+
+  const toggleVideo = () => {
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getVideoTracks().forEach(track => {
+        track.enabled = !videoEnabled;
+      });
+    }
+    setVideoEnabled(!videoEnabled);
+  };
 
   useEffect(() => {
     if (isLive) {
@@ -301,10 +353,22 @@ export default function DemoAdminPage() {
                   {/* PiP Video - Click to go back to full screen */}
                   <button
                     onClick={() => setActiveSlide(null)}
-                    className="absolute bottom-4 right-4 w-48 h-32 rounded-xl overflow-hidden shadow-2xl border-2 border-white/30 hover:border-white/60 transition group cursor-pointer"
+                    className="absolute bottom-4 right-4 w-48 h-32 rounded-xl overflow-hidden shadow-2xl border-2 border-white/30 hover:border-white/60 transition group cursor-pointer bg-gray-900"
                   >
-                    <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400')] bg-cover bg-center" />
-                    {!videoEnabled && (
+                    {/* Mirror the main video ref content */}
+                    {mediaStreamRef.current && videoEnabled ? (
+                      <video
+                        autoPlay
+                        muted
+                        playsInline
+                        ref={(el) => {
+                          if (el && mediaStreamRef.current) {
+                            el.srcObject = mediaStreamRef.current;
+                          }
+                        }}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    ) : (
                       <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
                         <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white text-lg font-bold">
                           H
@@ -359,14 +423,30 @@ export default function DemoAdminPage() {
               {/* Full Screen Video View */}
               {!activeSlide && (
                 <>
-                  {/* Simulated video background */}
-                  <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1560250097-0b93528c311a?w=800')] bg-cover bg-center opacity-90" />
+                  {/* Real webcam video */}
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className={`absolute inset-0 w-full h-full object-cover ${!videoEnabled ? 'hidden' : ''}`}
+                  />
 
-                  {!videoEnabled && (
+                  {/* Fallback when no camera or camera error */}
+                  {(cameraError || !videoEnabled) && (
                     <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
-                      <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white text-4xl font-bold">
-                        H
-                      </div>
+                      {cameraError && videoEnabled ? (
+                        <div className="text-center">
+                          <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white text-4xl font-bold mx-auto mb-4">
+                            H
+                          </div>
+                          <p className="text-white/60 text-sm max-w-xs">{cameraError}</p>
+                        </div>
+                      ) : (
+                        <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white text-4xl font-bold">
+                          H
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -397,7 +477,7 @@ export default function DemoAdminPage() {
             {/* Video Controls */}
             <div className="mt-4 flex items-center justify-center gap-3">
               <button
-                onClick={() => setMicEnabled(!micEnabled)}
+                onClick={toggleMic}
                 className={`w-12 h-12 rounded-full flex items-center justify-center transition ${
                   micEnabled ? 'bg-gray-200 hover:bg-gray-300 text-gray-700' : 'bg-red-500 hover:bg-red-600 text-white'
                 }`}
@@ -406,7 +486,7 @@ export default function DemoAdminPage() {
               </button>
 
               <button
-                onClick={() => setVideoEnabled(!videoEnabled)}
+                onClick={toggleVideo}
                 className={`w-12 h-12 rounded-full flex items-center justify-center transition ${
                   videoEnabled ? 'bg-gray-200 hover:bg-gray-300 text-gray-700' : 'bg-red-500 hover:bg-red-600 text-white'
                 }`}
