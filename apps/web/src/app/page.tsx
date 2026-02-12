@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function HomePage() {
   return (
@@ -22,6 +23,16 @@ export default function HomePage() {
 
       <main className="max-w-7xl mx-auto px-4 py-16">
         <section className="text-center mb-16">
+          <div className="flex justify-center mb-8">
+            <Image
+              src="/fflowcast-logo.png"
+              alt="FFLOW CAST"
+              width={280}
+              height={400}
+              className="object-contain"
+              priority
+            />
+          </div>
           <h2 className="text-5xl font-bold text-white mb-6">
             Live Shopping Events
           </h2>
