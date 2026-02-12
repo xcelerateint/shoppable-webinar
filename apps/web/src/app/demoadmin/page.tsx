@@ -38,6 +38,10 @@ import {
   ChevronRight,
   X,
   Plus,
+  Globe,
+  ExternalLink,
+  Edit3,
+  Check,
 } from 'lucide-react';
 
 // Mock data
@@ -111,6 +115,10 @@ export default function DemoAdminPage() {
   const [activeSlide, setActiveSlide] = useState<string | null>(null);
   const [slides, setSlides] = useState(MOCK_SLIDES);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [liveWebsiteOpen, setLiveWebsiteOpen] = useState(false);
+  const [liveWebsiteUrl, setLiveWebsiteUrl] = useState('https://example.com');
+  const [liveWebsiteActive, setLiveWebsiteActive] = useState(false);
+  const [editingWebsiteUrl, setEditingWebsiteUrl] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -121,6 +129,14 @@ export default function DemoAdminPage() {
     startCamera();
     return () => stopCamera();
   }, []);
+
+  // Re-attach video stream when returning from slide view
+  useEffect(() => {
+    if (!activeSlide && !liveWebsiteActive && videoRef.current && mediaStreamRef.current) {
+      videoRef.current.srcObject = mediaStreamRef.current;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [activeSlide, liveWebsiteActive]);
 
   const startCamera = async () => {
     try {
@@ -231,8 +247,8 @@ export default function DemoAdminPage() {
           <ul className="space-y-1">
             <li>
               <button
-                onClick={() => { setSlideStudioOpen(false); setActiveSlide(null); }}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-medium ${!slideStudioOpen ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100'}`}
+                onClick={() => { setSlideStudioOpen(false); setLiveWebsiteOpen(false); setActiveSlide(null); setLiveWebsiteActive(false); }}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-medium ${!slideStudioOpen && !liveWebsiteOpen && !activeSlide && !liveWebsiteActive ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100'}`}
               >
                 <Video className="w-5 h-5" />
                 Live Studio
@@ -295,6 +311,91 @@ export default function DemoAdminPage() {
                   setSlides([...slides, ...newSlides]);
                 }}
               />
+            </div>
+          )}
+
+          {/* Live Website Menu Item */}
+          <ul className="space-y-1 mt-2">
+            <li>
+              <button
+                onClick={() => setLiveWebsiteOpen(!liveWebsiteOpen)}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium ${liveWebsiteOpen ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100'}`}
+              >
+                <div className="flex items-center gap-3">
+                  <Globe className="w-5 h-5" />
+                  Live Website
+                </div>
+                <ChevronRight className={`w-4 h-4 transition-transform ${liveWebsiteOpen ? 'rotate-90' : ''}`} />
+              </button>
+            </li>
+          </ul>
+
+          {/* Live Website Panel */}
+          {liveWebsiteOpen && (
+            <div className="mt-2 ml-2 pl-4 border-l-2 border-indigo-200">
+              <div className="space-y-2">
+                {/* URL Input */}
+                <div className="bg-gray-50 rounded-lg p-2">
+                  {editingWebsiteUrl ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="url"
+                        value={liveWebsiteUrl}
+                        onChange={(e) => setLiveWebsiteUrl(e.target.value)}
+                        className="flex-1 text-xs bg-white border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="https://example.com"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => setEditingWebsiteUrl(false)}
+                        className="p-1 text-green-600 hover:bg-green-50 rounded"
+                      >
+                        <Check className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <Globe className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        <span className="text-xs text-gray-600 truncate">{liveWebsiteUrl}</span>
+                      </div>
+                      <button
+                        onClick={() => setEditingWebsiteUrl(true)}
+                        className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Preview thumbnail */}
+                <button
+                  onClick={() => {
+                    setLiveWebsiteActive(true);
+                    setActiveSlide(null);
+                  }}
+                  className={`w-full group relative rounded-lg overflow-hidden transition border-2 ${liveWebsiteActive ? 'border-indigo-500' : 'border-gray-200 hover:border-gray-300'}`}
+                >
+                  <div className="aspect-video bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-2">
+                    <div className="text-center">
+                      <Globe className="w-6 h-6 text-indigo-400 mx-auto mb-1" />
+                      <span className="text-indigo-600 text-xs font-medium">Share Website</span>
+                    </div>
+                  </div>
+                </button>
+
+                {/* Open in new tab */}
+                <a
+                  href={liveWebsiteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 px-3 py-2 text-xs text-gray-500 hover:text-indigo-600 transition"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Open in new tab
+                </a>
+              </div>
             </div>
           )}
 
@@ -367,15 +468,31 @@ export default function DemoAdminPage() {
             <div className="flex-1 bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl overflow-hidden relative shadow-xl min-h-[400px]">
 
               {/* Full Screen Slide View */}
-              {activeSlide && (
+              {activeSlide && !liveWebsiteActive && (
                 <>
-                  {/* Slide Content */}
-                  <div className={`absolute inset-0 bg-gradient-to-br ${slides.find(s => s.id === activeSlide)?.color} flex items-center justify-center`}>
+                  {/* Slide Content - Click to advance */}
+                  <button
+                    onClick={() => {
+                      const currentIndex = slides.findIndex(s => s.id === activeSlide);
+                      if (currentIndex < slides.length - 1) {
+                        setActiveSlide(slides[currentIndex + 1].id);
+                      }
+                    }}
+                    className={`absolute inset-0 bg-gradient-to-br ${slides.find(s => s.id === activeSlide)?.color} flex items-center justify-center cursor-pointer group`}
+                  >
                     <div className="text-center text-white p-8">
                       <h2 className="text-5xl font-bold mb-4">{slides.find(s => s.id === activeSlide)?.content}</h2>
                       <p className="text-xl opacity-80">{slides.find(s => s.id === activeSlide)?.title}</p>
                     </div>
-                  </div>
+                    {/* Click to advance hint */}
+                    {slides.findIndex(s => s.id === activeSlide) < slides.length - 1 && (
+                      <div className="absolute inset-0 flex items-center justify-end pr-8 opacity-0 group-hover:opacity-100 transition">
+                        <div className="bg-black/30 rounded-full p-3">
+                          <ChevronRight className="w-8 h-8 text-white" />
+                        </div>
+                      </div>
+                    )}
+                  </button>
 
                   {/* PiP Video - Click to go back to full screen */}
                   <button
@@ -447,8 +564,69 @@ export default function DemoAdminPage() {
                 </>
               )}
 
+              {/* Live Website View */}
+              {liveWebsiteActive && !activeSlide && (
+                <>
+                  {/* Website iframe */}
+                  <div className="absolute inset-0 bg-white">
+                    <iframe
+                      src={liveWebsiteUrl}
+                      className="w-full h-full border-0"
+                      title="Live Website"
+                      sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                    />
+                  </div>
+
+                  {/* PiP Video - Click to go back to full screen */}
+                  <button
+                    onClick={() => setLiveWebsiteActive(false)}
+                    className="absolute bottom-4 right-4 w-48 h-32 rounded-xl overflow-hidden shadow-2xl border-2 border-white/30 hover:border-white/60 transition group cursor-pointer bg-gray-900 z-10"
+                  >
+                    {mediaStreamRef.current && videoEnabled ? (
+                      <video
+                        autoPlay
+                        muted
+                        playsInline
+                        ref={(el) => {
+                          if (el && mediaStreamRef.current) {
+                            el.srcObject = mediaStreamRef.current;
+                          }
+                        }}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
+                        <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white text-lg font-bold">
+                          H
+                        </div>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center">
+                      <Maximize className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition" />
+                    </div>
+                    <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/50 rounded-full text-white text-xs">
+                      You
+                    </div>
+                  </button>
+
+                  {/* Close website button */}
+                  <button
+                    onClick={() => setLiveWebsiteActive(false)}
+                    className="absolute top-4 left-4 p-2 bg-black/50 hover:bg-black/70 rounded-lg text-white transition z-10"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+
+                  {/* URL indicator */}
+                  <div className="absolute top-4 right-4 px-3 py-1 bg-black/50 rounded-full text-white text-sm flex items-center gap-2 z-10">
+                    <Globe className="w-4 h-4" />
+                    {new URL(liveWebsiteUrl).hostname}
+                  </div>
+                </>
+              )}
+
               {/* Full Screen Video View */}
-              {!activeSlide && (
+              {!activeSlide && !liveWebsiteActive && (
                 <>
                   {/* Real webcam video */}
                   <video
