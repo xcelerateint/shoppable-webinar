@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "prebuild": "npm run build --workspace=@shoppable-webinar/shared",
     "build": "nest build",
     "dev": "nest start --watch",
     "start": "node dist/main",
