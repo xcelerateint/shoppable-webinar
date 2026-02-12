@@ -7,31 +7,31 @@ interface SoundEffect {
   id: string;
   name: string;
   icon: React.ReactNode;
+  color: string;
 }
 
-// Sound effect URLs - local files in /public/sounds/ or Mixkit CDN
 const SOUND_URLS: Record<string, string> = {
-  applause: '/sounds/applause.mp3', // Local file
-  cheering: 'https://assets.mixkit.co/active_storage/sfx/2193/2193-preview.mp3', // Crowd cheering
-  fireworks: 'https://assets.mixkit.co/active_storage/sfx/1461/1461-preview.mp3', // Fireworks
-  alert: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3', // Alert notification
-  drumroll: 'https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3', // Drum roll
-  chaching: '/sounds/chaching.mp3', // Cash register
-  success: 'https://assets.mixkit.co/active_storage/sfx/2190/2190-preview.mp3', // Success fanfare
-  tada: 'https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3', // Ta-da reveal
-  fail: '/sounds/fail.mp3', // Fail trumpet
+  applause: '/sounds/applause.mp3',
+  cheering: 'https://assets.mixkit.co/active_storage/sfx/2193/2193-preview.mp3',
+  fireworks: 'https://assets.mixkit.co/active_storage/sfx/1461/1461-preview.mp3',
+  alert: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3',
+  drumroll: 'https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3',
+  chaching: '/sounds/chaching.mp3',
+  success: 'https://assets.mixkit.co/active_storage/sfx/2190/2190-preview.mp3',
+  tada: 'https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3',
+  fail: '/sounds/fail.mp3',
 };
 
 const SOUND_EFFECTS: SoundEffect[] = [
-  { id: 'applause', name: 'Applause', icon: <Users className="w-4 h-4" /> },
-  { id: 'cheering', name: 'Cheering', icon: <ThumbsUp className="w-4 h-4" /> },
-  { id: 'chaching', name: 'Sale', icon: <DollarSign className="w-4 h-4" /> },
-  { id: 'tada', name: 'Reveal', icon: <Sparkles className="w-4 h-4" /> },
-  { id: 'drumroll', name: 'Suspense', icon: <Music className="w-4 h-4" /> },
-  { id: 'success', name: 'Success', icon: <Award className="w-4 h-4" /> },
-  { id: 'alert', name: 'Alert', icon: <AlertCircle className="w-4 h-4" /> },
-  { id: 'fireworks', name: 'Celebrate', icon: <Sparkles className="w-4 h-4" /> },
-  { id: 'fail', name: 'Fail', icon: <AlertCircle className="w-4 h-4" /> },
+  { id: 'applause', name: 'Applause', icon: <Users className="w-5 h-5" />, color: 'bg-pink-100 text-pink-600 hover:bg-pink-200' },
+  { id: 'cheering', name: 'Cheering', icon: <ThumbsUp className="w-5 h-5" />, color: 'bg-blue-100 text-blue-600 hover:bg-blue-200' },
+  { id: 'chaching', name: 'Sale', icon: <DollarSign className="w-5 h-5" />, color: 'bg-green-100 text-green-600 hover:bg-green-200' },
+  { id: 'tada', name: 'Reveal', icon: <Sparkles className="w-5 h-5" />, color: 'bg-purple-100 text-purple-600 hover:bg-purple-200' },
+  { id: 'drumroll', name: 'Suspense', icon: <Music className="w-5 h-5" />, color: 'bg-amber-100 text-amber-600 hover:bg-amber-200' },
+  { id: 'success', name: 'Success', icon: <Award className="w-5 h-5" />, color: 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200' },
+  { id: 'alert', name: 'Alert', icon: <AlertCircle className="w-5 h-5" />, color: 'bg-red-100 text-red-600 hover:bg-red-200' },
+  { id: 'fireworks', name: 'Celebrate', icon: <Sparkles className="w-5 h-5" />, color: 'bg-orange-100 text-orange-600 hover:bg-orange-200' },
+  { id: 'fail', name: 'Fail', icon: <AlertCircle className="w-5 h-5" />, color: 'bg-gray-100 text-gray-600 hover:bg-gray-200' },
 ];
 
 interface SoundBoardProps {
@@ -48,7 +48,6 @@ export function SoundBoard({ eventId, disabled }: SoundBoardProps) {
 
     setPlaying(soundId);
 
-    // Play sound locally for host feedback
     const url = SOUND_URLS[soundId];
     if (url) {
       if (!audioRef.current) {
@@ -59,7 +58,6 @@ export function SoundBoard({ eventId, disabled }: SoundBoardProps) {
       audioRef.current.play().catch(err => console.log('Audio play error:', err));
     }
 
-    // Send to viewers via API
     try {
       const token = localStorage.getItem('accessToken');
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -75,22 +73,18 @@ export function SoundBoard({ eventId, disabled }: SoundBoardProps) {
       console.error('Failed to trigger sound:', err);
     }
 
-    // Reset after sound duration
     setTimeout(() => setPlaying(null), 2000);
   };
 
   return (
-    <div className="bg-gray-800 rounded-xl p-3">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium text-gray-300 flex items-center gap-1.5">
-          <Volume2 className="w-4 h-4" />
-          Sound Effects
-        </h3>
-        {disabled && (
-          <span className="text-xs text-gray-500">Go live to enable</span>
-        )}
-      </div>
-      <div className="grid grid-cols-4 gap-1.5">
+    <div className="p-4">
+      {disabled && (
+        <div className="mb-4 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+          Go live to enable sound effects
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-2">
         {SOUND_EFFECTS.map((sound) => (
           <button
             key={sound.id}
@@ -98,16 +92,16 @@ export function SoundBoard({ eventId, disabled }: SoundBoardProps) {
             disabled={disabled || playing !== null}
             title={sound.name}
             className={`
-              bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white
-              px-2 py-1.5 rounded text-xs font-medium
-              flex items-center justify-center gap-1
+              ${sound.color}
+              p-3 rounded-xl text-xs font-medium
+              flex flex-col items-center justify-center gap-1.5
               transition-all duration-150
               disabled:opacity-40 disabled:cursor-not-allowed
-              ${playing === sound.id ? 'bg-primary-600 text-white ring-1 ring-primary-400' : ''}
+              ${playing === sound.id ? 'ring-2 ring-indigo-500 ring-offset-2 scale-95' : ''}
             `}
           >
             {sound.icon}
-            <span className="hidden sm:inline truncate">{sound.name}</span>
+            <span className="truncate">{sound.name}</span>
           </button>
         ))}
       </div>

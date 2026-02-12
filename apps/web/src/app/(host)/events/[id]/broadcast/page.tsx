@@ -1,11 +1,33 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { SoundBoard } from '@/components/host/SoundBoard';
 import { ViewerPanel } from '@/components/host/ViewerPanel';
 import { ChatModeration } from '@/components/host/ChatModeration';
+import {
+  Mic,
+  MicOff,
+  Video,
+  VideoOff,
+  PhoneOff,
+  Smile,
+  Maximize,
+  Users,
+  MessageCircle,
+  Share2,
+  Circle,
+  MoreHorizontal,
+  Settings,
+  LayoutGrid,
+  Clock,
+  ChevronLeft,
+  Volume2,
+  Link as LinkIcon,
+  Gift,
+} from 'lucide-react';
 
 interface EventData {
   id: string;
@@ -18,39 +40,65 @@ interface EventData {
 
 export default function BroadcastPage() {
   const params = useParams();
-  const router = useRouter();
   const eventId = params.id as string;
 
   const [event, setEvent] = useState<EventData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cameraReady, setCameraReady] = useState(false);
   const [streamStatus, setStreamStatus] = useState<'idle' | 'connecting' | 'live'>('idle');
   const [testStreamRunning, setTestStreamRunning] = useState(false);
-  const [cameraLoading, setCameraLoading] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [activeTab, setActiveTab] = useState<'participants' | 'chat' | 'sounds' | 'offers'>('participants');
+
+  // Controls state
+  const [micEnabled, setMicEnabled] = useState(true);
+  const [videoEnabled, setVideoEnabled] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     fetchEvent();
     return () => {
       stopCamera();
+      if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [eventId]);
+
+  useEffect(() => {
+    if (streamStatus === 'live' || testStreamRunning) {
+      timerRef.current = setInterval(() => {
+        setElapsedTime(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+      setElapsedTime(0);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [streamStatus, testStreamRunning]);
+
+  const formatTime = (seconds: number) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const fetchEvent = async () => {
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch(`http://localhost:4000/api/events/${eventId}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const res = await fetch(`${apiUrl}/api/events/${eventId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
         setEvent(data);
+        // Auto-start camera preview
+        startCamera();
       } else {
         setError('Failed to load event');
       }
@@ -63,49 +111,17 @@ export default function BroadcastPage() {
 
   const startCamera = async () => {
     try {
-      setError(null);
-      setCameraLoading(true);
-      console.log('Requesting camera access...');
-
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 30 },
-        },
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
         audio: true,
       });
-
-      console.log('Got stream:', stream);
-      console.log('Video tracks:', stream.getVideoTracks());
-
       mediaStreamRef.current = stream;
-
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        // Ensure video plays
-        try {
-          await videoRef.current.play();
-          console.log('Video playing');
-        } catch (playErr) {
-          console.log('Autoplay handled by browser');
-        }
+        await videoRef.current.play().catch(() => {});
       }
-
-      setCameraReady(true);
-      setCameraLoading(false);
     } catch (err: any) {
       console.error('Camera error:', err);
-      setCameraLoading(false);
-      if (err.name === 'NotAllowedError') {
-        setError('Camera permission denied. Please allow camera access in your browser settings.');
-      } else if (err.name === 'NotFoundError') {
-        setError('No camera found. Please connect a camera and try again.');
-      } else if (err.name === 'NotReadableError') {
-        setError('Camera is in use by another application. Please close other apps using the camera.');
-      } else {
-        setError(`Camera error: ${err.message || err.name || 'Unknown error'}`);
-      }
     }
   };
 
@@ -114,106 +130,24 @@ export default function BroadcastPage() {
       mediaStreamRef.current.getTracks().forEach(track => track.stop());
       mediaStreamRef.current = null;
     }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-    setCameraReady(false);
   };
 
-  const startStreaming = async () => {
-    if (!mediaStreamRef.current || !event) return;
-
-    setStreamStatus('connecting');
-
-    try {
-      const token = localStorage.getItem('accessToken');
-
-      // Try to set the event to live (skip if already live)
-      if (event.status === 'scheduled') {
-        const goLiveRes = await fetch(`http://localhost:4000/api/events/${eventId}/go-live`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!goLiveRes.ok) {
-          const errData = await goLiveRes.json();
-          throw new Error(errData.message || 'Failed to go live');
-        }
-      }
-
-      // Connect to our WebSocket relay server
-      const ws = new WebSocket(`ws://localhost:4000/stream-relay?streamKey=${event.streamKey}`);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        console.log('Connected to stream relay');
-
-        // Start MediaRecorder
-        const mediaRecorder = new MediaRecorder(mediaStreamRef.current!, {
-          mimeType: 'video/webm;codecs=vp8,opus',
-          videoBitsPerSecond: 2500000,
-        });
-
-        mediaRecorder.ondataavailable = (e) => {
-          if (e.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-            ws.send(e.data);
-          }
-        };
-
-        mediaRecorder.start(1000); // Send data every second
-        mediaRecorderRef.current = mediaRecorder;
-
-        setIsStreaming(true);
-        setStreamStatus('live');
-      };
-
-      ws.onerror = (err) => {
-        console.error('WebSocket error:', err);
-        setError('Stream connection failed');
-        setStreamStatus('idle');
-      };
-
-      ws.onclose = () => {
-        console.log('Stream relay disconnected');
-        if (isStreaming) {
-          setIsStreaming(false);
-          setStreamStatus('idle');
-        }
-      };
-
-    } catch (err) {
-      console.error('Streaming error:', err);
-      setError((err as Error).message);
-      setStreamStatus('idle');
-    }
-  };
-
-  const stopStreaming = async () => {
-    // Stop MediaRecorder
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-      mediaRecorderRef.current = null;
-    }
-
-    // Close WebSocket
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-
-    // End the event
-    try {
-      const token = localStorage.getItem('accessToken');
-      await fetch(`http://localhost:4000/api/events/${eventId}/end`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+  const toggleMic = () => {
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getAudioTracks().forEach(track => {
+        track.enabled = !micEnabled;
       });
-    } catch (err) {
-      console.error('Failed to end event:', err);
+      setMicEnabled(!micEnabled);
     }
+  };
 
-    setIsStreaming(false);
-    setStreamStatus('idle');
+  const toggleVideo = () => {
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getVideoTracks().forEach(track => {
+        track.enabled = !videoEnabled;
+      });
+      setVideoEnabled(!videoEnabled);
+    }
   };
 
   const startTestStream = async () => {
@@ -221,16 +155,16 @@ export default function BroadcastPage() {
       setStreamStatus('connecting');
       setError(null);
       const token = localStorage.getItem('accessToken');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
-      // Try to go live first (will fail if already live, that's ok)
       if (event?.status === 'scheduled') {
-        await fetch(`http://localhost:4000/api/events/${eventId}/go-live`, {
+        await fetch(`${apiUrl}/api/events/${eventId}/go-live`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
         });
       }
 
-      const res = await fetch(`http://localhost:4000/api/events/${eventId}/test-stream`, {
+      const res = await fetch(`${apiUrl}/api/events/${eventId}/test-stream`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -238,12 +172,10 @@ export default function BroadcastPage() {
       if (res.ok) {
         setTestStreamRunning(true);
         setStreamStatus('live');
-        setError(null);
-        // Refresh event data
         fetchEvent();
       } else {
         const data = await res.json();
-        setError(data.message || 'Failed to start test stream');
+        setError(data.message || 'Failed to start stream');
         setStreamStatus('idle');
       }
     } catch (err) {
@@ -255,31 +187,38 @@ export default function BroadcastPage() {
   const stopTestStream = async () => {
     try {
       const token = localStorage.getItem('accessToken');
-      await fetch(`http://localhost:4000/api/events/${eventId}/stop-test-stream`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      await fetch(`${apiUrl}/api/events/${eventId}/stop-test-stream`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
       setTestStreamRunning(false);
       setStreamStatus('idle');
     } catch (err) {
-      console.error('Failed to stop test stream:', err);
+      console.error('Failed to stop stream:', err);
+    }
+  };
+
+  const endStream = async () => {
+    if (confirm('Are you sure you want to end this broadcast?')) {
+      await stopTestStream();
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-white">Loading...</div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   if (error && !event) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-400 mb-4">{error}</p>
-          <Link href="/dashboard" className="text-primary-400 hover:underline">
+          <p className="text-red-500 mb-4">{error}</p>
+          <Link href="/dashboard" className="text-indigo-600 hover:underline">
             Back to Dashboard
           </Link>
         </div>
@@ -287,246 +226,300 @@ export default function BroadcastPage() {
     );
   }
 
+  const isLive = streamStatus === 'live' || testStreamRunning;
+
   return (
-    <div className="min-h-screen bg-gray-900">
-      {/* Header */}
-      <header className="border-b border-gray-800 px-4 py-3">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-            <Link href="/dashboard" className="text-gray-400 hover:text-white text-sm">
-              ← Back
-            </Link>
-            <h1 className="text-lg sm:text-xl font-bold text-white truncate max-w-[200px] sm:max-w-none">{event?.title}</h1>
-            {streamStatus === 'live' && (
-              <span className="flex items-center gap-1 sm:gap-2 bg-red-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold">
-                <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
-                LIVE
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-4">
-            {event && (
-              <Link
-                href={`/e/${event.slug || event.id}`}
-                target="_blank"
-                className="text-gray-400 hover:text-white text-xs sm:text-sm"
-              >
-                View as Viewer →
-              </Link>
-            )}
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* Left Sidebar */}
+      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+        {/* Logo/Back */}
+        <div className="p-4 border-b border-gray-100">
+          <Link href="/dashboard" className="flex items-center gap-2 text-gray-600 hover:text-gray-900">
+            <ChevronLeft className="w-5 h-5" />
+            <Image src="/fflowcast-logo.png" alt="FFLOW CAST" width={32} height={32} className="rounded" />
+            <span className="font-semibold text-gray-900">FFLOW CAST</span>
+          </Link>
+        </div>
+
+        {/* User Profile */}
+        <div className="p-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
+              H
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">Host</p>
+              <p className="text-xs text-gray-500">Presenter</p>
+            </div>
           </div>
         </div>
-      </header>
 
-      <main className="max-w-6xl mx-auto p-4 lg:p-6">
-        {error && (
-          <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-4 lg:mb-6 text-sm">
-            {error}
-          </div>
-        )}
+        {/* Navigation */}
+        <nav className="flex-1 p-4">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Broadcast</p>
+          <ul className="space-y-1">
+            <li>
+              <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-indigo-50 text-indigo-700 font-medium">
+                <Video className="w-5 h-5" />
+                Live Studio
+              </button>
+            </li>
+            <li>
+              <Link href="/dashboard" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100">
+                <LayoutGrid className="w-5 h-5" />
+                Dashboard
+              </Link>
+            </li>
+            <li>
+              <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100">
+                <Settings className="w-5 h-5" />
+                Settings
+              </button>
+            </li>
+          </ul>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
-          {/* Camera Preview */}
-          <div className="lg:col-span-2">
-            <div className="bg-gray-800 rounded-xl overflow-hidden">
-              <div className="aspect-video bg-black relative">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
-                {!cameraReady && !cameraLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-                    <div className="text-center">
-                      <svg className="w-16 h-16 text-gray-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                      <p className="text-gray-400">Camera preview will appear here</p>
-                    </div>
-                  </div>
-                )}
-                {cameraLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-                    <div className="text-center">
-                      <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                      <p className="text-gray-400">Accessing camera...</p>
-                    </div>
-                  </div>
-                )}
-                {streamStatus === 'connecting' && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/70">
-                    <div className="text-center">
-                      <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                      <p className="text-white">Connecting to stream...</p>
-                    </div>
-                  </div>
-                )}
-              </div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 mt-6">Quick Actions</p>
+          <ul className="space-y-1">
+            <li>
+              <button
+                onClick={() => setActiveTab('offers')}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100"
+              >
+                <Gift className="w-5 h-5" />
+                Drop Offer
+              </button>
+            </li>
+            <li>
+              <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100">
+                <LinkIcon className="w-5 h-5" />
+                Drop Link
+              </button>
+            </li>
+          </ul>
+        </nav>
 
-              {/* Controls */}
-              <div className="p-4 border-t border-gray-700">
-                <div className="flex flex-col items-center gap-4">
-                  {/* Test Stream Controls */}
-                  {!testStreamRunning ? (
-                    <button
-                      onClick={startTestStream}
-                      disabled={streamStatus === 'connecting'}
-                      className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg font-bold flex items-center gap-2 disabled:opacity-50"
-                    >
-                      {streamStatus === 'connecting' ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          Connecting...
-                        </>
-                      ) : (
-                        <>
-                          <span className="w-3 h-3 bg-white rounded-full"></span>
-                          Start Test Stream
-                        </>
-                      )}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={stopTestStream}
-                      className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-lg font-bold flex items-center gap-2"
-                    >
-                      <span className="w-3 h-3 bg-white rounded-full animate-pulse"></span>
-                      Stop Test Stream
-                    </button>
-                  )}
-
-                  {testStreamRunning && (
-                    <p className="text-green-400 text-sm">
-                      Test stream is running! View it at{' '}
-                      <Link href={`/e/${event?.slug || event?.id}`} target="_blank" className="underline">
-                        the viewer page
-                      </Link>
-                    </p>
-                  )}
-
-                  {/* Camera Controls (browser streaming) */}
-                  <div className="border-t border-gray-700 pt-4 mt-2 w-full">
-                    <p className="text-gray-400 text-sm text-center mb-3">Or stream from your camera:</p>
-                    <div className="flex items-center justify-center gap-4">
-                      {!cameraReady ? (
-                        <button
-                          onClick={startCamera}
-                          disabled={cameraLoading}
-                          className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg font-semibold flex items-center gap-2 disabled:opacity-50"
-                        >
-                          {cameraLoading ? (
-                            <>
-                              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                              Accessing Camera...
-                            </>
-                          ) : (
-                            <>
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                              </svg>
-                              Enable Camera
-                            </>
-                          )}
-                        </button>
-                      ) : !isStreaming ? (
-                        <>
-                          <button
-                            onClick={stopCamera}
-                            className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm"
-                          >
-                            Disable Camera
-                          </button>
-                          <button
-                            onClick={startStreaming}
-                            disabled={streamStatus === 'connecting' || testStreamRunning}
-                            className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 disabled:opacity-50"
-                          >
-                            <span className="w-3 h-3 bg-white rounded-full"></span>
-                            Go Live with Camera
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          onClick={stopStreaming}
-                          className="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"
-                        >
-                          <span className="w-3 h-3 bg-red-500 rounded-full"></span>
-                          End Camera Stream
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
+        {/* Stream Status */}
+        <div className="p-4 border-t border-gray-100">
+          <div className={`px-3 py-2 rounded-lg ${isLive ? 'bg-red-50' : 'bg-gray-100'}`}>
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${isLive ? 'bg-red-500 animate-pulse' : 'bg-gray-400'}`} />
+              <span className={`text-sm font-medium ${isLive ? 'text-red-700' : 'text-gray-600'}`}>
+                {isLive ? 'LIVE' : 'Offline'}
+              </span>
             </div>
           </div>
+        </div>
+      </aside>
 
-          {/* Side Panel */}
-          <div className="space-y-4 lg:space-y-6">
-            {/* Viewer Panel */}
-            {event && <ViewerPanel eventId={event.id} />}
-
-            {/* Chat Moderation */}
-            {event && <ChatModeration eventId={event.id} />}
-
-            {/* Sound Board */}
-            {event && (
-              <SoundBoard
-                eventId={event.id}
-                disabled={streamStatus !== 'live' && !testStreamRunning}
-              />
-            )}
-
-            {/* Stream Info */}
-            <div className="bg-gray-800 rounded-xl p-4">
-              <h3 className="text-lg font-semibold text-white mb-4">Stream Info</h3>
-              <div className="space-y-3 text-sm">
-                <div>
-                  <span className="text-gray-400">Status:</span>
-                  <span className={`ml-2 ${streamStatus === 'live' ? 'text-red-400' : 'text-gray-300'}`}>
-                    {streamStatus === 'live' ? '🔴 Live' : streamStatus === 'connecting' ? '🟡 Connecting...' : '⚪ Offline'}
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col">
+        {/* Top Header */}
+        <header className="bg-white border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold text-gray-900">{event?.title}</h1>
+                {isLive && (
+                  <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                    LIVE
                   </span>
-                </div>
-                <div>
-                  <span className="text-gray-400">Event:</span>
-                  <span className="ml-2 text-gray-300">{event?.title}</span>
-                </div>
+                )}
               </div>
             </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 text-gray-600">
+                <Clock className="w-4 h-4" />
+                <span className="font-mono text-lg">{formatTime(elapsedTime)}</span>
+              </div>
+              {event && (
+                <Link
+                  href={`/e/${event.slug || event.id}`}
+                  target="_blank"
+                  className="px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
+                >
+                  View as Viewer →
+                </Link>
+              )}
+            </div>
+          </div>
+        </header>
 
-            {/* Quick Tips */}
-            <div className="bg-gray-800 rounded-xl p-4">
-              <h3 className="text-lg font-semibold text-white mb-4">Quick Tips</h3>
-              <ul className="text-sm text-gray-400 space-y-2">
-                <li>• Make sure you have good lighting</li>
-                <li>• Use a stable internet connection</li>
-                <li>• Test your audio before going live</li>
-                <li>• Close other apps using your camera</li>
-              </ul>
+        {/* Video Area */}
+        <div className="flex-1 p-6 flex gap-6">
+          {/* Video + Controls */}
+          <div className="flex-1 flex flex-col">
+            {/* Video Container */}
+            <div className="flex-1 bg-gray-900 rounded-2xl overflow-hidden relative shadow-xl">
+              <video
+                ref={videoRef}
+                autoPlay
+                muted
+                playsInline
+                className={`w-full h-full object-cover ${!videoEnabled ? 'hidden' : ''}`}
+              />
+              {!videoEnabled && (
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
+                  <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white text-4xl font-bold">
+                    H
+                  </div>
+                </div>
+              )}
+
+              {/* You label */}
+              <div className="absolute top-4 left-4 px-3 py-1 bg-black/50 rounded-full text-white text-sm">
+                You
+              </div>
+
+              {/* Live indicator */}
+              {isLive && (
+                <div className="absolute top-4 right-4 px-3 py-1 bg-red-600 rounded-full text-white text-sm font-semibold flex items-center gap-2">
+                  <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                  LIVE
+                </div>
+              )}
             </div>
 
-            {/* External Streaming Option */}
-            <div className="bg-gray-800 rounded-xl p-4">
-              <h3 className="text-lg font-semibold text-white mb-4">Advanced: Use OBS</h3>
-              <p className="text-sm text-gray-400 mb-3">
-                For professional streaming with scenes and overlays, use OBS Studio:
-              </p>
-              <div className="space-y-2 text-xs">
-                <div>
-                  <span className="text-gray-500">Server:</span>
-                  <code className="ml-2 text-gray-300 bg-gray-700 px-2 py-1 rounded">
-                    rtmps://global-live.mux.com:443/app
-                  </code>
-                </div>
-                <div>
-                  <span className="text-gray-500">Stream Key:</span>
-                  <code className="ml-2 text-gray-300 bg-gray-700 px-2 py-1 rounded text-xs break-all">
-                    {event?.streamKey}
-                  </code>
-                </div>
+            {/* Video Controls */}
+            <div className="mt-4 flex items-center justify-center gap-3">
+              <button
+                onClick={toggleMic}
+                className={`w-12 h-12 rounded-full flex items-center justify-center transition ${
+                  micEnabled ? 'bg-gray-200 hover:bg-gray-300 text-gray-700' : 'bg-red-500 hover:bg-red-600 text-white'
+                }`}
+              >
+                {micEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+              </button>
+
+              <button
+                onClick={toggleVideo}
+                className={`w-12 h-12 rounded-full flex items-center justify-center transition ${
+                  videoEnabled ? 'bg-gray-200 hover:bg-gray-300 text-gray-700' : 'bg-red-500 hover:bg-red-600 text-white'
+                }`}
+              >
+                {videoEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+              </button>
+
+              {isLive ? (
+                <button
+                  onClick={endStream}
+                  className="w-14 h-14 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition shadow-lg"
+                >
+                  <PhoneOff className="w-6 h-6" />
+                </button>
+              ) : (
+                <button
+                  onClick={startTestStream}
+                  disabled={streamStatus === 'connecting'}
+                  className="px-6 h-14 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center gap-2 transition shadow-lg disabled:opacity-50"
+                >
+                  {streamStatus === 'connecting' ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Circle className="w-5 h-5 fill-current" />
+                      <span className="font-semibold">Go Live</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              <button className="w-12 h-12 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 flex items-center justify-center transition">
+                <Smile className="w-5 h-5" />
+              </button>
+
+              <button className="w-12 h-12 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 flex items-center justify-center transition">
+                <Maximize className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="mt-6 flex items-center justify-center gap-2">
+              <button
+                onClick={() => setActiveTab('participants')}
+                className={`flex flex-col items-center gap-1 px-4 py-3 rounded-xl transition ${
+                  activeTab === 'participants' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+                }`}
+              >
+                <Users className="w-5 h-5" />
+                <span className="text-xs font-medium">Viewers</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('chat')}
+                className={`flex flex-col items-center gap-1 px-4 py-3 rounded-xl transition ${
+                  activeTab === 'chat' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+                }`}
+              >
+                <MessageCircle className="w-5 h-5" />
+                <span className="text-xs font-medium">Chat</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('sounds')}
+                className={`flex flex-col items-center gap-1 px-4 py-3 rounded-xl transition ${
+                  activeTab === 'sounds' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+                }`}
+              >
+                <Volume2 className="w-5 h-5" />
+                <span className="text-xs font-medium">Sounds</span>
+              </button>
+
+              <button className="flex flex-col items-center gap-1 px-4 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition">
+                <Share2 className="w-5 h-5" />
+                <span className="text-xs font-medium">Share</span>
+              </button>
+
+              <button className="flex flex-col items-center gap-1 px-4 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition">
+                <Circle className="w-5 h-5" />
+                <span className="text-xs font-medium">Record</span>
+              </button>
+
+              <button className="flex flex-col items-center gap-1 px-4 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition">
+                <MoreHorizontal className="w-5 h-5" />
+                <span className="text-xs font-medium">More</span>
+              </button>
+            </div>
+
+            {error && (
+              <div className="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                {error}
               </div>
+            )}
+          </div>
+
+          {/* Right Sidebar Panel */}
+          <div className="w-80 bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
+            {/* Panel Header */}
+            <div className="px-4 py-3 border-b border-gray-100">
+              <h3 className="font-semibold text-gray-900 capitalize">
+                {activeTab === 'participants' && 'Viewers'}
+                {activeTab === 'chat' && 'Live Chat'}
+                {activeTab === 'sounds' && 'Sound Effects'}
+                {activeTab === 'offers' && 'Offers'}
+              </h3>
+            </div>
+
+            {/* Panel Content */}
+            <div className="flex-1 overflow-y-auto">
+              {activeTab === 'participants' && event && (
+                <ViewerPanel eventId={event.id} />
+              )}
+              {activeTab === 'chat' && event && (
+                <ChatModeration eventId={event.id} />
+              )}
+              {activeTab === 'sounds' && event && (
+                <SoundBoard eventId={event.id} disabled={!isLive} />
+              )}
+              {activeTab === 'offers' && (
+                <div className="p-4 text-center text-gray-500">
+                  <Gift className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                  <p className="text-sm">Create and launch offers during your broadcast</p>
+                  <button className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">
+                    Create Offer
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -1,0 +1,15 @@
+=== COPY THESE TO RAILWAY API SERVICE VARIABLES ===
+
+DATABASE_URL = (click "Add Reference" -> select PostgreSQL -> DATABASE_URL)
+REDIS_URL = (click "Add Reference" -> select Redis -> REDIS_URL)  
+JWT_SECRET = fflowcast-jwt-secret-prod-2024
+JWT_REFRESH_SECRET = fflowcast-refresh-secret-prod-2024
+NODE_ENV = production
+CORS_ORIGINS = https://your-web-service-url.up.railway.app
+
+=== FOR WORKER SERVICE ===
+DATABASE_URL = (same reference as above)
+REDIS_URL = (same reference as above)
+
+=== IMPORTANT ===
+Delete any variable that has an EMPTY KEY NAME (that's causing your build error)

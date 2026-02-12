@@ -41,7 +41,6 @@ export function ChatModeration({ eventId }: ChatModerationProps) {
           createdAt: string;
           isPinned?: boolean;
         }>;
-        // Reverse to get oldest first for chronological display
         setMessages(data.map(m => ({ ...m, createdAt: new Date(m.createdAt) })).reverse());
 
         const pinned = await chat.getPinned(eventId) as { id: string } | null;
@@ -57,11 +56,9 @@ export function ChatModeration({ eventId }: ChatModerationProps) {
 
     loadChat();
 
-    // Connect to WebSocket for real-time updates and sending messages
     const token = localStorage.getItem('accessToken');
     wsClient.connect(eventId, token || undefined);
 
-    // Subscribe to WebSocket for real-time updates
     const unsubscribers = [
       wsClient.on('chat_message', (msg) => {
         const data = msg.data as ChatMessage;
@@ -129,74 +126,77 @@ export function ChatModeration({ eventId }: ChatModerationProps) {
     }
   };
 
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'host': return 'text-indigo-600 bg-indigo-50';
+      case 'moderator': return 'text-green-600 bg-green-50';
+      default: return 'text-gray-700 bg-gray-100';
+    }
+  };
+
   if (loading) {
     return (
-      <div className="bg-gray-800 rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-4">
-          <MessageSquare className="w-5 h-5 text-white" />
-          <h3 className="text-lg font-semibold text-white">Chat</h3>
-        </div>
-        <div className="flex justify-center py-8">
-          <div className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-        </div>
+      <div className="flex flex-col h-full items-center justify-center py-8">
+        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="bg-gray-800 rounded-xl p-4 flex flex-col h-full max-h-96">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-          <MessageSquare className="w-5 h-5" />
-          Chat
-        </h3>
-        <span className="text-xs text-gray-400">{messages.length} messages</span>
-      </div>
-
+    <div className="flex flex-col h-full">
       {/* Pinned message indicator */}
       {pinnedMessageId && (
-        <div className="mb-2 px-2 py-1 bg-primary-900/50 rounded text-xs text-primary-300 flex items-center gap-1">
-          <Pin className="w-3 h-3" />
+        <div className="mx-4 mt-3 px-3 py-2 bg-indigo-50 rounded-lg text-sm text-indigo-700 flex items-center gap-2">
+          <Pin className="w-4 h-4" />
           <span>1 message pinned</span>
         </div>
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.length === 0 ? (
-          <p className="text-gray-400 text-sm text-center py-4">No messages yet</p>
+          <div className="text-center py-8">
+            <MessageSquare className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+            <p className="text-gray-400 text-sm">No messages yet</p>
+          </div>
         ) : (
           messages.map((msg) => (
             <div
               key={msg.id}
-              className={`group flex items-start gap-2 p-2 rounded-lg hover:bg-gray-700/50 ${
-                pinnedMessageId === msg.id ? 'bg-primary-900/30 border border-primary-600/50' : ''
+              className={`group relative p-3 rounded-xl transition ${
+                pinnedMessageId === msg.id
+                  ? 'bg-indigo-50 border border-indigo-200'
+                  : 'bg-gray-50 hover:bg-gray-100'
               }`}
             >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`font-semibold text-sm ${
-                      msg.user.role === 'host'
-                        ? 'text-primary-400'
-                        : msg.user.role === 'moderator'
-                        ? 'text-green-400'
-                        : 'text-gray-300'
-                    }`}
-                  >
-                    {msg.user.displayName}
-                  </span>
-                  {pinnedMessageId === msg.id && (
-                    <Pin className="w-3 h-3 text-primary-400" />
-                  )}
+              <div className="flex items-start gap-3">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 ${getRoleColor(msg.user.role)}`}>
+                  {msg.user.displayName.charAt(0).toUpperCase()}
                 </div>
-                <p className="text-sm text-gray-200 break-words">{msg.content}</p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-medium text-gray-900 text-sm">
+                      {msg.user.displayName}
+                    </span>
+                    {msg.user.role === 'host' && (
+                      <span className="px-1.5 py-0.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded">Host</span>
+                    )}
+                    {pinnedMessageId === msg.id && (
+                      <Pin className="w-3 h-3 text-indigo-500" />
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-600 break-words">{msg.content}</p>
+                </div>
               </div>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+
+              {/* Action buttons */}
+              <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
                   onClick={() => handlePin(msg.id)}
-                  className={`p-1 rounded hover:bg-gray-600 ${
-                    pinnedMessageId === msg.id ? 'text-primary-400' : 'text-gray-400'
+                  className={`p-1.5 rounded-lg transition ${
+                    pinnedMessageId === msg.id
+                      ? 'bg-indigo-100 text-indigo-600'
+                      : 'bg-white text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 shadow-sm'
                   }`}
                   title={pinnedMessageId === msg.id ? 'Unpin message' : 'Pin message'}
                 >
@@ -208,7 +208,7 @@ export function ChatModeration({ eventId }: ChatModerationProps) {
                 </button>
                 <button
                   onClick={() => handleDelete(msg.id)}
-                  className="p-1 rounded text-gray-400 hover:text-red-400 hover:bg-gray-600"
+                  className="p-1.5 rounded-lg bg-white text-gray-400 hover:text-red-500 hover:bg-red-50 shadow-sm transition"
                   title="Delete message"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -221,7 +221,7 @@ export function ChatModeration({ eventId }: ChatModerationProps) {
       </div>
 
       {/* Host message input */}
-      <div className="mt-3 pt-3 border-t border-gray-700">
+      <div className="p-4 border-t border-gray-100 bg-gray-50">
         <div className="flex items-center gap-2">
           <input
             type="text"
@@ -229,13 +229,13 @@ export function ChatModeration({ eventId }: ChatModerationProps) {
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Send a message as host..."
-            className="flex-1 bg-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="flex-1 bg-white border border-gray-200 text-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             maxLength={500}
           />
           <button
             onClick={handleSend}
             disabled={!inputValue.trim()}
-            className="p-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg transition-colors"
+            className="p-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-colors"
           >
             <Send className="w-4 h-4 text-white" />
           </button>
