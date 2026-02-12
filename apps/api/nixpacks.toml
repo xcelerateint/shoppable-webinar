@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["nodejs_20", "npm-9_x", "openssl"]
+
+[phases.install]
+cmds = ["cd ../.. && npm ci"]
+
+[phases.build]
+cmds = ["cd ../.. && npx turbo run build --filter=@shoppable-webinar/api"]
+
+[start]
+cmd = "npx prisma migrate deploy && node dist/main.js"

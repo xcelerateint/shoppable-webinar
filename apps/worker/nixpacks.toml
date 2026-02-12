@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["nodejs_20", "npm-9_x"]
+
+[phases.install]
+cmds = ["cd ../.. && npm ci"]
+
+[phases.build]
+cmds = ["cd ../.. && npx turbo run build --filter=@shoppable-webinar/worker"]
+
+[start]
+cmd = "node dist/main.js"
