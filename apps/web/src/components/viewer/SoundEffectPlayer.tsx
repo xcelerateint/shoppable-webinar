@@ -3,16 +3,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { wsClient } from '@/lib/ws';
 
-// Better quality sound effect URLs from free sources
+// Sound effect URLs from Mixkit (free, reliable CDN)
 const SOUND_URLS: Record<string, string> = {
-  applause: 'https://cdn.freesound.org/previews/140/140714_2433868-lq.mp3',
-  cheering: 'https://cdn.freesound.org/previews/213/213830_61963-lq.mp3',
-  fireworks: 'https://cdn.freesound.org/previews/369/369920_2679618-lq.mp3',
-  alert: 'https://cdn.freesound.org/previews/352/352661_2542516-lq.mp3',
-  drumroll: 'https://cdn.freesound.org/previews/177/177112_3306749-lq.mp3',
-  chaching: 'https://cdn.freesound.org/previews/131/131660_2337290-lq.mp3',
-  success: 'https://cdn.freesound.org/previews/320/320655_5260872-lq.mp3',
-  tada: 'https://cdn.freesound.org/previews/397/397355_4284968-lq.mp3',
+  applause: 'https://assets.mixkit.co/active_storage/sfx/212/212-preview.mp3',
+  cheering: 'https://assets.mixkit.co/active_storage/sfx/2193/2193-preview.mp3',
+  fireworks: 'https://assets.mixkit.co/active_storage/sfx/1461/1461-preview.mp3',
+  alert: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3',
+  drumroll: 'https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3',
+  chaching: 'https://assets.mixkit.co/active_storage/sfx/2954/2954-preview.mp3',
+  success: 'https://assets.mixkit.co/active_storage/sfx/2190/2190-preview.mp3',
+  tada: 'https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3',
 };
 
 const SOUND_LABELS: Record<string, string> = {

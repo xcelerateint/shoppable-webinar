@@ -9,16 +9,16 @@ interface SoundEffect {
   icon: React.ReactNode;
 }
 
-// Better quality sound effect URLs from free sources
+// Sound effect URLs from Mixkit (free, reliable CDN)
 const SOUND_URLS: Record<string, string> = {
-  applause: 'https://cdn.freesound.org/previews/140/140714_2433868-lq.mp3', // Real audience applause
-  cheering: 'https://cdn.freesound.org/previews/213/213830_61963-lq.mp3', // Crowd cheering
-  fireworks: 'https://cdn.freesound.org/previews/369/369920_2679618-lq.mp3', // Fireworks celebration
-  alert: 'https://cdn.freesound.org/previews/352/352661_2542516-lq.mp3', // Attention alert
-  drumroll: 'https://cdn.freesound.org/previews/177/177112_3306749-lq.mp3', // Drum roll suspense
-  chaching: 'https://cdn.freesound.org/previews/131/131660_2337290-lq.mp3', // Cash register
-  success: 'https://cdn.freesound.org/previews/320/320655_5260872-lq.mp3', // Success fanfare
-  tada: 'https://cdn.freesound.org/previews/397/397355_4284968-lq.mp3', // Ta-da reveal
+  applause: 'https://assets.mixkit.co/active_storage/sfx/212/212-preview.mp3', // Audience applause
+  cheering: 'https://assets.mixkit.co/active_storage/sfx/2193/2193-preview.mp3', // Crowd cheering
+  fireworks: 'https://assets.mixkit.co/active_storage/sfx/1461/1461-preview.mp3', // Fireworks
+  alert: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3', // Alert notification
+  drumroll: 'https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3', // Drum roll
+  chaching: 'https://assets.mixkit.co/active_storage/sfx/2954/2954-preview.mp3', // Cash register
+  success: 'https://assets.mixkit.co/active_storage/sfx/2190/2190-preview.mp3', // Success fanfare
+  tada: 'https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3', // Ta-da reveal
 };
 
 const SOUND_EFFECTS: SoundEffect[] = [
@@ -60,7 +60,8 @@ export function SoundBoard({ eventId, disabled }: SoundBoardProps) {
     // Send to viewers via API
     try {
       const token = localStorage.getItem('accessToken');
-      await fetch(`http://localhost:4000/api/events/${eventId}/sound-effect`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      await fetch(`${apiUrl}/api/events/${eventId}/sound-effect`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
