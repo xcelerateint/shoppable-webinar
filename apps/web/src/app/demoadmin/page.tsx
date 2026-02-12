@@ -116,9 +116,19 @@ export default function DemoAdminPage() {
   const [slides, setSlides] = useState(MOCK_SLIDES);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [liveWebsiteOpen, setLiveWebsiteOpen] = useState(false);
-  const [liveWebsiteUrl, setLiveWebsiteUrl] = useState('https://example.com');
+  const [liveWebsiteUrl, setLiveWebsiteUrl] = useState('https://wikipedia.org');
   const [liveWebsiteActive, setLiveWebsiteActive] = useState(false);
   const [editingWebsiteUrl, setEditingWebsiteUrl] = useState(false);
+  const [websiteError, setWebsiteError] = useState(false);
+
+  // Helper to safely get hostname
+  const getHostname = (url: string) => {
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return url;
+    }
+  };
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -347,7 +357,7 @@ export default function DemoAdminPage() {
                         autoFocus
                       />
                       <button
-                        onClick={() => setEditingWebsiteUrl(false)}
+                        onClick={() => { setEditingWebsiteUrl(false); setWebsiteError(false); }}
                         className="p-1 text-green-600 hover:bg-green-50 rounded"
                       >
                         <Check className="w-4 h-4" />
@@ -372,6 +382,7 @@ export default function DemoAdminPage() {
                 {/* Preview thumbnail */}
                 <button
                   onClick={() => {
+                    setWebsiteError(false);
                     setLiveWebsiteActive(true);
                     setActiveSlide(null);
                   }}
@@ -567,19 +578,62 @@ export default function DemoAdminPage() {
               {/* Live Website View */}
               {liveWebsiteActive && !activeSlide && (
                 <>
-                  {/* Website iframe */}
-                  <div className="absolute inset-0 bg-white">
-                    <iframe
-                      src={liveWebsiteUrl}
-                      className="w-full h-full border-0"
-                      title="Live Website"
-                      sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                    />
+                  {/* Website iframe or error state */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200">
+                    {websiteError ? (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-center p-8">
+                          <div className="w-20 h-20 bg-gray-300 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Globe className="w-10 h-10 text-gray-500" />
+                          </div>
+                          <h3 className="text-xl font-semibold text-gray-700 mb-2">Website Cannot Be Embedded</h3>
+                          <p className="text-gray-500 mb-4 max-w-md">
+                            This website blocks embedding. Try a different site or use screen sharing instead.
+                          </p>
+                          <div className="flex gap-3 justify-center">
+                            <a
+                              href={liveWebsiteUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium flex items-center gap-2"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                              Open in New Tab
+                            </a>
+                            <button
+                              onClick={() => { setLiveWebsiteActive(false); setWebsiteError(false); }}
+                              className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium"
+                            >
+                              Go Back
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <iframe
+                        src={liveWebsiteUrl}
+                        className="w-full h-full border-0"
+                        title="Live Website"
+                        onError={() => setWebsiteError(true)}
+                        onLoad={(e) => {
+                          // Check if iframe loaded successfully (some sites still load but show errors)
+                          try {
+                            const iframe = e.target as HTMLIFrameElement;
+                            // This will throw if cross-origin and blocked
+                            if (iframe.contentWindow?.location.href === 'about:blank') {
+                              setWebsiteError(true);
+                            }
+                          } catch {
+                            // Cross-origin access is normal, iframe loaded successfully
+                          }
+                        }}
+                      />
+                    )}
                   </div>
 
                   {/* PiP Video - Click to go back to full screen */}
                   <button
-                    onClick={() => setLiveWebsiteActive(false)}
+                    onClick={() => { setLiveWebsiteActive(false); setWebsiteError(false); }}
                     className="absolute bottom-4 right-4 w-48 h-32 rounded-xl overflow-hidden shadow-2xl border-2 border-white/30 hover:border-white/60 transition group cursor-pointer bg-gray-900 z-10"
                   >
                     {mediaStreamRef.current && videoEnabled ? (
@@ -611,7 +665,7 @@ export default function DemoAdminPage() {
 
                   {/* Close website button */}
                   <button
-                    onClick={() => setLiveWebsiteActive(false)}
+                    onClick={() => { setLiveWebsiteActive(false); setWebsiteError(false); }}
                     className="absolute top-4 left-4 p-2 bg-black/50 hover:bg-black/70 rounded-lg text-white transition z-10"
                   >
                     <X className="w-5 h-5" />
@@ -620,7 +674,7 @@ export default function DemoAdminPage() {
                   {/* URL indicator */}
                   <div className="absolute top-4 right-4 px-3 py-1 bg-black/50 rounded-full text-white text-sm flex items-center gap-2 z-10">
                     <Globe className="w-4 h-4" />
-                    {new URL(liveWebsiteUrl).hostname}
+                    {getHostname(liveWebsiteUrl)}
                   </div>
                 </>
               )}
