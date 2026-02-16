@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import Image from 'next/image';
 
 export default function HomePage() {
@@ -8,15 +7,14 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-white">FFLOW CAST</h1>
           <nav className="flex items-center gap-4">
-            <Link href="/login" className="text-gray-300 hover:text-white">
+            <span className="text-gray-300">
               Login
-            </Link>
-            <Link
-              href="/register"
-              className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg"
+            </span>
+            <span
+              className="bg-primary-600 text-white px-4 py-2 rounded-lg"
             >
               Sign Up
-            </Link>
+            </span>
           </nav>
         </div>
       </header>
@@ -41,18 +39,16 @@ export default function HomePage() {
             seamless checkout experiences.
           </p>
           <div className="flex items-center justify-center gap-4">
-            <Link
-              href="/register"
-              className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-lg text-lg font-semibold"
+            <span
+              className="bg-primary-600 text-white px-8 py-3 rounded-lg text-lg font-semibold"
             >
               Get Started
-            </Link>
-            <Link
-              href="/events"
-              className="border border-gray-600 hover:border-gray-500 text-white px-8 py-3 rounded-lg text-lg"
+            </span>
+            <span
+              className="border border-gray-600 text-white px-8 py-3 rounded-lg text-lg"
             >
               Browse Events
-            </Link>
+            </span>
           </div>
         </section>
 
